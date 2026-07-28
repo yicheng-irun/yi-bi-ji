@@ -1,8 +1,9 @@
 import styled, { keyframes } from 'styled-components'
 
-const bounce = keyframes`
-  0%, 80%, 100% { transform: translateY(0); opacity: .4; }
-  40% { transform: translateY(-6px); opacity: 1; }
+const breathe = keyframes`
+  0%, 100% { transform: translateY(0) scale(.6); opacity: .45; }
+  40% { transform: translateY(-8px) scale(1.15); opacity: 1; }
+  80% { transform: translateY(0) scale(.6); opacity: .45; }
 `
 
 const Wrap = styled.div`
@@ -11,10 +12,12 @@ const Wrap = styled.div`
 
   svg circle {
     fill: var(--accent);
-    animation: ${bounce} 1.2s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ${breathe} 1.8s ease-in-out infinite;
   }
-  svg circle:nth-child(2) { animation-delay: .15s; }
-  svg circle:nth-child(3) { animation-delay: .3s; }
+  svg circle:nth-child(2) { animation-delay: .3s; }
+  svg circle:nth-child(3) { animation-delay: .6s; }
 
   .text { font-size: 13px; }
 `
@@ -22,10 +25,10 @@ const Wrap = styled.div`
 export function Loading({ text = '加载中…' }: { text?: string }) {
   return (
     <Wrap>
-      <svg width="48" height="16" viewBox="0 0 48 16">
-        <circle cx="10" cy="8" r="4" />
-        <circle cx="24" cy="8" r="4" />
-        <circle cx="38" cy="8" r="4" />
+      <svg width="48" height="24" viewBox="0 0 48 24">
+        <circle cx="10" cy="18" r="4" />
+        <circle cx="24" cy="18" r="4" />
+        <circle cx="38" cy="18" r="4" />
       </svg>
       <div className="text">{text}</div>
     </Wrap>
