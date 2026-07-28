@@ -2,6 +2,8 @@
 
 基于 Mastra 的 agent 笔记系统。pnpm workspace 大仓。
 
+> **功能开发或修改后，必须同步更新 [`FEATURES.md`](./FEATURES.md)**，保持特性说明与实际实现一致。
+
 ## 结构
 
 - `apps/server` — Hono + Mastra + Sequelize(SQLite)，端口 15201

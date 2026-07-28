@@ -3,34 +3,48 @@ import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
 
-const List = styled.div`
-  max-width: 800px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+const Page = styled.div`
+  max-width: 760px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 16px;
 `
 
-const Row = styled(Link)`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #fff;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  color: inherit;
-  &:hover { border-color: #0969da; }
+const CreateBar = styled.div`
+  display: flex; gap: 10px; align-items: center;
+  input { flex: 1; height: 42px; font-size: 15px; }
+  button { height: 42px; padding: 0 20px; }
+`
+
+const Card = styled(Link)`
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  color: inherit; box-shadow: var(--shadow-sm);
+  transition: box-shadow .15s, border-color .15s;
+
+  &:hover {
+    box-shadow: var(--shadow); border-color: var(--accent);
+  }
+
+  .icon { font-size: 22px; flex-shrink: 0; }
+  .info { flex: 1; min-width: 0; }
+  .title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 `
 
 const Badge = styled.span`
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  color: #7d4e00;
-  border-radius: 10px;
-  font-size: 12px;
-  padding: 1px 8px;
-  margin-left: 8px;
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  background: var(--orange-bg); color: var(--orange); border: 1px solid #fcd34d;
+`
+
+const Empty = styled.div`
+  text-align: center; padding: 60px 20px; color: var(--text-secondary);
+  .icon { font-size: 48px; margin-bottom: 12px; }
+  p { font-size: 15px; }
+`
+
+const Count = styled.div`
+  font-size: 13px; color: var(--text-secondary); padding: 0 2px;
 `
 
 export default function NotesPage() {
@@ -57,29 +71,38 @@ export default function NotesPage() {
   }
 
   return (
-    <List>
-      <div style={{ display: 'flex', gap: 8 }}>
+    <Page>
+      <CreateBar>
         <input
-          style={{ flex: 1 }}
-          placeholder="新笔记标题"
+          placeholder="新建笔记标题，回车即创建"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && create()}
         />
-        <button className="primary" onClick={create}>新建笔记</button>
-      </div>
+        <button className="btn-primary" onClick={create}>新建笔记</button>
+      </CreateBar>
+
+      {notes.length > 0 && <Count>共 {notes.length} 篇笔记</Count>}
+
       {notes.map((n) => (
-        <Row key={n.id} to={`/notes/${n.id}`}>
-          <span>
-            {n.draftTitle || '(无标题)'}
+        <Card key={n.id} to={`/notes/${n.id}`}>
+          <span className="icon">{n.hasChanges ? '📄' : '📋'}</span>
+          <div className="info">
+            <div className="title">{n.draftTitle || '(无标题)'}</div>
+            <div className="meta">{new Date(n.updatedAt).toLocaleString('zh-CN')}</div>
+          </div>
+          <div className="actions">
             {n.hasChanges && <Badge>未提交</Badge>}
-          </span>
-          <span style={{ color: '#57606a', fontSize: 13 }}>
-            {new Date(n.updatedAt).toLocaleString('zh-CN')}
-          </span>
-        </Row>
+          </div>
+        </Card>
       ))}
-      {notes.length === 0 && <p style={{ color: '#57606a' }}>还没有笔记，创建一篇吧。</p>}
-    </List>
+
+      {notes.length === 0 && (
+        <Empty>
+          <div className="icon">📝</div>
+          <p>还没有笔记，在上方输入标题并回车创建第一篇</p>
+        </Empty>
+      )}
+    </Page>
   )
 }
