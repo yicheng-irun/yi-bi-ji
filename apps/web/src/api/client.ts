@@ -94,6 +94,8 @@ export const api = {
     request<Thread>('/api/chat/threads', { method: 'POST', body: JSON.stringify({ title, noteId }) }),
   getMessages: (threadId: string) =>
     request<{ messages: ChatMessage[] }>(`/api/chat/threads/${threadId}/messages`),
+  deleteThread: (threadId: string) =>
+    request<{ ok: boolean }>(`/api/chat/threads/${threadId}`, { method: 'DELETE' }),
 }
 
 export interface StreamHandlers {

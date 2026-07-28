@@ -25,12 +25,19 @@ const ThreadItem = styled.div<{ $active: boolean }>`
 
   &:hover { background: ${(p) => (p.$active ? 'var(--accent-light)' : 'var(--bg-hover)')}; }
 
-  .t-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .t-head { display: flex; align-items: center; gap: 6px; }
   .t-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; display: flex; gap: 6px; align-items: center; }
   .t-origin {
     background: var(--orange-bg); color: var(--orange);
     border-radius: 4px; padding: 0 5px; font-size: 10px;
   }
+  .t-del {
+    border: none; background: transparent; padding: 2px 4px; font-size: 13px;
+    color: var(--text-muted); opacity: 0; transition: opacity .15s; flex-shrink: 0;
+    &:hover { color: var(--red); }
+  }
+  &:hover .t-del { opacity: 1; }
 `
 
 const ChatArea = styled.div`
@@ -65,6 +72,16 @@ export default function ConversationsPage() {
   const active = threads.find((t) => t.id === activeId)
   const originNoteId = active?.metadata?.originNoteId
 
+  const removeThread = async (t: Thread) => {
+    if (!confirm(`确定删除会话「${t.title || '对话'}」？消息记录将一并删除。`)) return
+    await api.deleteThread(t.id)
+    setThreads((ts) => {
+      const next = ts.filter((x) => x.id !== t.id)
+      if (activeId === t.id) setActiveId(next[0]?.id ?? '')
+      return next
+    })
+  }
+
   return (
     <Wrap>
       <ThreadList>
@@ -74,7 +91,14 @@ export default function ConversationsPage() {
         {error && !loading && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>{error}</p>}
         {!loading && !error && threads.map((t) => (
           <ThreadItem key={t.id} $active={t.id === activeId} onClick={() => setActiveId(t.id)}>
-            <div className="t-title">{t.title || '对话'}</div>
+            <div className="t-head">
+              <div className="t-title">{t.title || '对话'}</div>
+              <button
+                className="t-del"
+                title="删除会话"
+                onClick={(e) => { e.stopPropagation(); void removeThread(t) }}
+              >🗑</button>
+            </div>
             <div className="t-sub">
               {t.metadata?.originNoteId
                 ? <span className="t-origin">笔记 #{t.metadata.originNoteId}</span>

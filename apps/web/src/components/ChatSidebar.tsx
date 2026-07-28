@@ -72,6 +72,18 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
           </FilterToggle>
         )}
         <button onClick={() => setThreadId('')}>+</button>
+        {threadId && (
+          <button
+            title="删除当前会话"
+            onClick={async () => {
+              const t = threads.find((x) => x.id === threadId)
+              if (!confirm(`确定删除会话「${t?.title || '对话'}」？消息记录将一并删除。`)) return
+              await api.deleteThread(threadId)
+              setThreads((ts) => ts.filter((x) => x.id !== threadId))
+              setThreadId('')
+            }}
+          >🗑</button>
+        )}
       </Header>
       <ChatPanel
         threadId={threadId}

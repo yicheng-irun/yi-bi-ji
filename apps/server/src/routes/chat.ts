@@ -32,6 +32,11 @@ chatRoutes.post('/threads', async (c) => {
   return c.json(thread, 201)
 })
 
+chatRoutes.delete('/threads/:id', async (c) => {
+  await memory.deleteThread(c.req.param('id'))
+  return c.json({ ok: true })
+})
+
 chatRoutes.get('/threads/:id/messages', async (c) => {
   const threadId = c.req.param('id')
   const result = await memory.recall({ threadId, resourceId: RESOURCE_ID })
