@@ -1,0 +1,36 @@
+# bi-ji
+
+基于 Mastra 的 agent 笔记系统。pnpm workspace 大仓。
+
+## 结构
+
+- `apps/server` — Hono + Mastra + Sequelize(SQLite)，端口 15201
+- `apps/web` — React + TS + styled-components + Vite + vite-plugin-pages，端口 15200（/api 代理到 15201）
+
+## 常用命令
+
+```bash
+pnpm install            # 安装依赖
+pnpm dev                # 并行启动 server + web
+pnpm -r run typecheck   # 类型检查（改完代码必须跑）
+pnpm -r run build       # 构建
+```
+
+## 配置
+
+`apps/server/.env`（参考 `.env.example`）：
+
+- `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` — OpenAI 兼容端点
+- `PORT` — 默认 15201
+
+## 数据
+
+- `apps/server/data/notes.db` — 业务库（Sequelize，启动时 `sync({alter:true})`，索引需具名）
+- `apps/server/data/mastra.db` — Mastra 会话记忆（LibSQLStore）
+
+## 核心概念
+
+- 笔记有 `committed*`（正式）与 `draft*`（草稿）两套内容 + 草稿版本号计数；AI 和用户只能改 draft，commit 才落库
+- diff = 当前草稿 vs 上次提交版本（行级，`diff` 库 structuredPatch）；前端 hunk 级 Accept/Reject 后重组内容提交
+- 保存草稿带 baseVersion 校验，冲突返回 409；`/api/events` 全局 SSE 同步草稿变更
+- AI 工具只改 draft 并写 `ai_change_logs` 审计表

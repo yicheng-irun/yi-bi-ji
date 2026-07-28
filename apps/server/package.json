@@ -1,0 +1,29 @@
+{
+  "name": "@bi-ji/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "latest",
+    "@hono/node-server": "latest",
+    "@mastra/core": "latest",
+    "@mastra/libsql": "latest",
+    "@mastra/memory": "latest",
+    "diff": "latest",
+    "hono": "latest",
+    "sequelize": "latest",
+    "sqlite3": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/diff": "latest",
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
