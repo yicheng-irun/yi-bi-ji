@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Hunk, type NoteDiff } from '../../api/client'
+import { Loading } from '../../components/Loading'
 
 const Page = styled.div`
   max-width: 900px; margin: 0 auto;
@@ -91,10 +92,13 @@ export default function ChangeDetailPage() {
   const navigate = useNavigate()
 
   const [diff, setDiff] = useState<NoteDiff | null>(null)
+  const [error, setError] = useState('')
   const [accepted, setAccepted] = useState<boolean[]>([])
 
   useEffect(() => {
-    void (() => api.getDiff(noteId).then((d) => { setDiff(d); setAccepted(d.hunks.map(() => true)) }).catch(console.error))()
+    api.getDiff(noteId)
+      .then((d) => { setDiff(d); setAccepted(d.hunks.map(() => true)) })
+      .catch((e) => { console.error(e); setError('加载失败，请稍后重试') })
   }, [noteId])
 
   const finalContent = useMemo(
@@ -114,7 +118,9 @@ export default function ChangeDetailPage() {
     navigate('/changes')
   }
 
-  if (!diff) return <p style={{ color: 'var(--text-secondary)' }}>加载中…</p>
+  if (!diff) return error
+    ? <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>{error}</p>
+    : <Loading />
 
   return (
     <Page>

@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { NavLink, useRoutes } from 'react-router-dom'
 import routes from '~react-pages'
 import { Layout, Main, TopBar } from './styles'
+import { Loading } from './components/Loading'
 
 export default function App() {
   return (
@@ -15,7 +16,7 @@ export default function App() {
         </nav>
       </TopBar>
       <Main>
-        <Suspense fallback={<p>加载中…</p>}>{useRoutes(routes)}</Suspense>
+        <Suspense fallback={<Loading />}>{useRoutes(routes)}</Suspense>
       </Main>
     </Layout>
   )

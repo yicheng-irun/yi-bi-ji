@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
+import { Loading } from '../components/Loading'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -49,10 +50,16 @@ const Count = styled.div`
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [title, setTitle] = useState('')
   const navigate = useNavigate()
 
-  const load = () => api.listNotes().then(setNotes).catch(console.error)
+  const load = () =>
+    api.listNotes()
+      .then((list) => { setNotes(list); setError('') })
+      .catch((e) => { console.error(e); setError('加载失败，请稍后重试') })
+      .finally(() => setLoading(false))
   useEffect(() => { void load() }, [])
 
   useEffect(() => {
@@ -82,9 +89,12 @@ export default function NotesPage() {
         <button className="btn-primary" onClick={create}>新建笔记</button>
       </CreateBar>
 
-      {notes.length > 0 && <Count>共 {notes.length} 篇笔记</Count>}
+      {loading && <Loading />}
+      {error && !loading && <Empty><p>{error}</p></Empty>}
 
-      {notes.map((n) => (
+      {!loading && !error && notes.length > 0 && <Count>共 {notes.length} 篇笔记</Count>}
+
+      {!loading && !error && notes.map((n) => (
         <Card key={n.id} to={`/notes/${n.id}`}>
           <span className="icon">{n.hasChanges ? '📄' : '📋'}</span>
           <div className="info">
@@ -97,7 +107,7 @@ export default function NotesPage() {
         </Card>
       ))}
 
-      {notes.length === 0 && (
+      {!loading && !error && notes.length === 0 && (
         <Empty>
           <div className="icon">📝</div>
           <p>还没有笔记，在上方输入标题并回车创建第一篇</p>

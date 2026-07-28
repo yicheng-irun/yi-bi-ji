@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type ChangeItem } from '../../api/client'
+import { Loading } from '../../components/Loading'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -42,9 +43,16 @@ const Empty = styled.div`
 
 export default function ChangesPage() {
   const [changes, setChanges] = useState<ChangeItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  useEffect(() => { void (() => api.listChanges().then(setChanges).catch(console.error))() }, [])
+  useEffect(() => {
+    api.listChanges()
+      .then(setChanges)
+      .catch((e) => { console.error(e); setError('加载失败，请稍后重试') })
+      .finally(() => setLoading(false))
+  }, [])
 
   const commitAll = async () => {
     if (!confirm(`确定提交全部 ${changes.length} 篇笔记的变更？落库后不可还原。`)) return
@@ -56,12 +64,15 @@ export default function ChangesPage() {
     <Page>
       <Header>
         <h2>未提交的变更</h2>
-        <span className="count">{changes.length} 篇</span>
+        {!loading && <span className="count">{changes.length} 篇</span>}
         <div className="spacer" />
-        {changes.length > 0 && <button className="btn-green" onClick={commitAll}>全部提交</button>}
+        {!loading && changes.length > 0 && <button className="btn-green" onClick={commitAll}>全部提交</button>}
       </Header>
 
-      {changes.map((c) => (
+      {loading && <Loading />}
+      {error && !loading && <Empty><p>{error}</p></Empty>}
+
+      {!loading && !error && changes.map((c) => (
         <Card key={c.id} to={`/changes/${c.id}`}>
           <div className="indicator">△</div>
           <div className="info">
@@ -75,7 +86,7 @@ export default function ChangesPage() {
         </Card>
       ))}
 
-      {changes.length === 0 && (
+      {!loading && !error && changes.length === 0 && (
         <Empty>
           <div className="icon">✔</div>
           <p>所有笔记均已提交，没有待处理的变更</p>

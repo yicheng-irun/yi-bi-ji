@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { api, type Note } from '../../api/client'
+import { Loading } from '../../components/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
 
 const slideUp = keyframes`
@@ -175,7 +176,7 @@ export default function NoteEditorPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [save])
 
-  if (!note) return <p style={{ color: 'var(--text-secondary)' }}>加载中…</p>
+  if (!note) return <Loading />
 
   return (
     <Wrap>

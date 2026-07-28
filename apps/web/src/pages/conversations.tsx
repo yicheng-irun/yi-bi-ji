@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, type ChatMessage, type Thread } from '../api/client'
+import { api, type Thread } from '../api/client'
+import { ChatPanel } from '../components/ChatPanel'
+import { Loading } from '../components/Loading'
 
 const Wrap = styled.div`
-  max-width: 960px; margin: 0 auto;
+  max-width: 1100px; margin: 0 auto;
   display: flex; gap: 20px; height: 100%;
 `
 
@@ -23,114 +26,84 @@ const ThreadItem = styled.div<{ $active: boolean }>`
   &:hover { background: ${(p) => (p.$active ? 'var(--accent-light)' : 'var(--bg-hover)')}; }
 
   .t-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .t-time { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .t-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+  .t-origin {
+    background: var(--orange-bg); color: var(--orange);
+    border-radius: 4px; padding: 0 5px; font-size: 10px;
+  }
 `
 
-const MsgPane = styled.div`
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
-  padding: 4px 0;
+const ChatArea = styled.div`
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);
 `
 
-const MsgGroup = styled.div<{ $role: string }>`
-  display: flex; gap: 10px; align-items: flex-start;
-  flex-direction: ${(p) => (p.$role === 'user' ? 'row-reverse' : 'row')};
-  max-width: 100%;
+const ChatHeader = styled.div`
+  padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-hover);
+  font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px;
+  .origin { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 `
-
-const Avatar = styled.div<{ $role: string }>`
-  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700;
-  background: ${(p) => (p.$role === 'user' ? 'var(--accent-light)' : '#f3f4f6')};
-  color: ${(p) => (p.$role === 'user' ? 'var(--accent)' : 'var(--text-secondary)')};
-`
-
-const MsgBubble = styled.div<{ $role: string }>`
-  background: ${(p) => (p.$role === 'user' ? 'var(--accent-light)' : '#f9fafb')};
-  border-radius: ${(p) => (p.$role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px')};
-  padding: 10px 14px; font-size: 14px; line-height: 1.55;
-  white-space: pre-wrap; word-break: break-word; max-width: 75%;
-  color: var(--text);
-`
-
-const ToolChip = styled.div`
-  align-self: flex-start; font-size: 12px; color: var(--text-secondary);
-  background: #f3f4f6; border: 1px solid var(--border);
-  border-radius: 6px; padding: 4px 10px; display: flex; align-items: center; gap: 5px;
-`
-
-const Empty = styled.div`
-  text-align: center; padding: 60px 20px; color: var(--text-secondary);
-  flex: 1;
-`
-
-const toolNames: Record<string, string> = {
-  list_notes: '列出笔记', search_notes: '搜索笔记', read_note: '读取笔记',
-  create_note: '创建笔记', write_note: '全量写', replace_in_note: '替换文本',
-  insert_block: '插入区块',
-}
 
 export default function ConversationsPage() {
   const [threads, setThreads] = useState<Thread[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [activeId, setActiveId] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
 
   useEffect(() => {
     api.listThreads().then((res) => {
       const list = Array.isArray(res) ? res : res.threads ?? []
       setThreads(list)
       if (list.length > 0) setActiveId(list[0].id)
-    }).catch(console.error)
+    }).catch((e) => {
+      console.error(e)
+      setError('加载失败，请稍后重试')
+    }).finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    if (!activeId) return
-    api.getMessages(activeId).then((res) => setMessages(res.messages)).catch(console.error)
-  }, [activeId])
+  const active = threads.find((t) => t.id === activeId)
+  const originNoteId = active?.metadata?.originNoteId
 
   return (
     <Wrap>
       <ThreadList>
-        <button onClick={async () => {
-          const t = await api.createThread()
-          setThreads((ts) => [t, ...ts])
-          setActiveId(t.id)
-        }}>+ 新建对话</button>
+        <button onClick={() => setActiveId('')}>+ 新建全局对话</button>
 
-        {threads.map((t) => (
+        {loading && <Loading />}
+        {error && !loading && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>{error}</p>}
+        {!loading && !error && threads.map((t) => (
           <ThreadItem key={t.id} $active={t.id === activeId} onClick={() => setActiveId(t.id)}>
             <div className="t-title">{t.title || '对话'}</div>
-            <div className="t-time">{new Date(t.updatedAt).toLocaleString('zh-CN')}</div>
+            <div className="t-sub">
+              {t.metadata?.originNoteId
+                ? <span className="t-origin">笔记 #{t.metadata.originNoteId}</span>
+                : <span className="t-origin" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>全局</span>}
+              <span>{new Date(t.updatedAt).toLocaleString('zh-CN')}</span>
+            </div>
           </ThreadItem>
         ))}
-        {threads.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>暂无会话</p>}
+        {!loading && !error && threads.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>暂无会话</p>}
       </ThreadList>
 
-      {activeId ? (
-        <MsgPane>
-          {messages.map((m, i) => (
-            <div key={i} style={{ display: 'contents' }}>
-              {m.parts.filter((p) => p.type === 'tool').map((p, j) => (
-                <ToolChip key={j}>
-                  🔧 {toolNames[p.toolName ?? ''] || p.toolName}
-                </ToolChip>
-              ))}
-              {m.parts.some((p) => p.type === 'text' && p.text) && (
-                <MsgGroup $role={m.role}>
-                  <Avatar $role={m.role}>{m.role === 'user' ? '我' : 'AI'}</Avatar>
-                  <MsgBubble $role={m.role}>
-                    {m.parts.filter((p) => p.type === 'text').map((p) => p.text).join('')}
-                  </MsgBubble>
-                </MsgGroup>
-              )}
-            </div>
-          ))}
-        </MsgPane>
-      ) : (
-        <Empty>
-          <p>选择左侧的对话查看消息记录</p>
-        </Empty>
-      )}
+      <ChatArea>
+        <ChatHeader>
+          {active ? (active.title || '对话') : '新对话'}
+          {originNoteId && (
+            <span className="origin">
+              关联 <Link to={`/notes/${originNoteId}`}>笔记 #{originNoteId}</Link>
+            </span>
+          )}
+        </ChatHeader>
+        <ChatPanel
+          key={activeId || 'new'}
+          threadId={activeId}
+          onThreadCreated={(t) => {
+            setThreads((ts) => [t, ...ts])
+            setActiveId(t.id)
+          }}
+        />
+      </ChatArea>
     </Wrap>
   )
 }

@@ -17,7 +17,7 @@ chatRoutes.get('/threads', async (c) => {
 })
 
 chatRoutes.post('/threads', async (c) => {
-  const body = await c.req.json<{ title?: string }>().catch(() => ({} as { title?: string }))
+  const body = await c.req.json<{ title?: string; noteId?: number }>().catch(() => ({} as { title?: string; noteId?: number }))
   const now = new Date()
   const thread = await memory.saveThread({
     thread: {
@@ -26,6 +26,7 @@ chatRoutes.post('/threads', async (c) => {
       title: body.title ?? `对话 ${now.toLocaleString('zh-CN')}`,
       createdAt: now,
       updatedAt: now,
+      ...(typeof body.noteId === 'number' ? { metadata: { originNoteId: body.noteId } } : {}),
     },
   })
   return c.json(thread, 201)

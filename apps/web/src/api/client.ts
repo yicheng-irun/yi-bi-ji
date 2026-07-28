@@ -40,6 +40,7 @@ export interface Thread {
   resourceId: string
   createdAt: string
   updatedAt: string
+  metadata?: { originNoteId?: number }
 }
 
 export interface ChatPart {
@@ -89,8 +90,8 @@ export const api = {
   commitAll: () => request<Note[]>('/api/changes/commit-all', { method: 'POST', body: '{}' }),
   getDiff: (id: number) => request<NoteDiff>(`/api/changes/${id}/diff`),
   listThreads: () => request<Thread[] | { threads: Thread[] }>('/api/chat/threads'),
-  createThread: (title?: string) =>
-    request<Thread>('/api/chat/threads', { method: 'POST', body: JSON.stringify({ title }) }),
+  createThread: (title?: string, noteId?: number) =>
+    request<Thread>('/api/chat/threads', { method: 'POST', body: JSON.stringify({ title, noteId }) }),
   getMessages: (threadId: string) =>
     request<{ messages: ChatMessage[] }>(`/api/chat/threads/${threadId}/messages`),
 }
