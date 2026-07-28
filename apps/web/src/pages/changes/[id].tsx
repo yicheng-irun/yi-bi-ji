@@ -77,8 +77,8 @@ function buildFinalContent(committed: string, hunks: Hunk[], accepted: boolean[]
   hunks.forEach((h, i) => {
     const start = h.oldStart - 1
     out.push(...oldLines.slice(cursor, start))
-    if (accepted[i]) out.push(...h.lines.filter((l) => l[0] !== '-').map((l) => l.slice(1)))
-    else out.push(...h.lines.filter((l) => l[0] !== '+').map((l) => l.slice(1)))
+    if (accepted[i]) out.push(...h.lines.filter((l) => l[0] === ' ' || l[0] === '+').map((l) => l.slice(1)))
+    else out.push(...h.lines.filter((l) => l[0] === ' ' || l[0] === '-').map((l) => l.slice(1)))
     cursor = start + h.oldLines
   })
   out.push(...oldLines.slice(cursor))
@@ -151,7 +151,7 @@ export default function ChangeDetailPage() {
               ✗ Reject
             </BtnReject>
           </HunkHeader>
-          {h.lines.map((l, j) => <LineRow key={j} $kind={l[0]}>{l}</LineRow>)}
+          {h.lines.filter((l) => l[0] !== '\\').map((l, j) => <LineRow key={j} $kind={l[0]}>{l}</LineRow>)}
         </HunkBox>
       ))}
 

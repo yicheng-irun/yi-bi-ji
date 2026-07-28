@@ -110,6 +110,7 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const sendingRef = useRef(false)
 
   useEffect(() => {
     api.listThreads().then((res) => {
@@ -121,7 +122,9 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
 
   useEffect(() => {
     if (!threadId) { setItems([]); return }
+    if (sendingRef.current) return
     api.getMessages(threadId).then((res) => {
+      if (sendingRef.current) return
       setItems(res.messages.map((m) => ({
         role: m.role ?? 'assistant',
         text: m.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join(''),

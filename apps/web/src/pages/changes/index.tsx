@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, type ChangeItem } from '../api/client'
+import { api, type ChangeItem } from '../../api/client'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
