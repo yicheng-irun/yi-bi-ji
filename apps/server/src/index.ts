@@ -7,6 +7,7 @@ import { notesRoutes, noteErrorHandler } from './routes/notes.js'
 import { changesRoutes } from './routes/changes.js'
 import { chatRoutes } from './routes/chat.js'
 import { eventsRoutes } from './routes/events.js'
+import { closeBrowser } from './services/browser.js'
 
 await initDb()
 
@@ -24,3 +25,9 @@ app.route('/api/events', eventsRoutes)
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`)
 })
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(sig, () => {
+    void closeBrowser().finally(() => process.exit(0))
+  })
+}

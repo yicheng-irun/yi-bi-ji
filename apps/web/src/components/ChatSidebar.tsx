@@ -75,6 +75,7 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
         {threadId && (
           <button
             title="删除当前会话"
+            style={{ color: 'var(--red)', fontSize: 16, padding: '0 10px' }}
             onClick={async () => {
               const t = threads.find((x) => x.id === threadId)
               if (!confirm(`确定删除会话「${t?.title || '对话'}」？消息记录将一并删除。`)) return

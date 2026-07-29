@@ -1,9 +1,9 @@
 import styled, { keyframes } from 'styled-components'
 
 const breathe = keyframes`
-  0%, 100% { transform: translateY(0) scale(.6); opacity: .45; }
-  40% { transform: translateY(-8px) scale(1.15); opacity: 1; }
-  80% { transform: translateY(0) scale(.6); opacity: .45; }
+  0%, 100% { transform: translateY(0) scale(.4); opacity: .45; }
+  40% { transform: translateY(-8px) scale(1.35); opacity: 1; }
+  80% { transform: translateY(0) scale(.4); opacity: .45; }
 `
 
 const Wrap = styled.div`
@@ -14,7 +14,9 @@ const Wrap = styled.div`
     fill: var(--accent);
     transform-box: fill-box;
     transform-origin: center;
-    animation: ${breathe} 1.8s ease-in-out infinite;
+    transform: translateY(0) scale(.4);
+    opacity: .45;
+    animation: ${breathe} 1.8s ease-in-out infinite backwards;
   }
   svg circle:nth-child(2) { animation-delay: .3s; }
   svg circle:nth-child(3) { animation-delay: .6s; }

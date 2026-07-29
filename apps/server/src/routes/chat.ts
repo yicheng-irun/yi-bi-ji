@@ -100,6 +100,7 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
       const result = await agent.stream(userMessage, {
         memory: { resource: RESOURCE_ID, thread: threadId },
         requestContext,
+        maxSteps: 15,
       })
 
       for await (const chunk of result.fullStream) {

@@ -80,7 +80,7 @@ interface DisplayItem {
 export const toolNames: Record<string, string> = {
   list_notes: '列笔记', search_notes: '搜索', read_note: '读取',
   create_note: '新建', write_note: '全量写', replace_in_note: '替换',
-  insert_block: '插入',
+  insert_block: '插入', web_search: '联网搜索', web_fetch: '打开网页',
 }
 
 const roleAvatars: Record<string, string> = { user: '我', assistant: 'AI' }

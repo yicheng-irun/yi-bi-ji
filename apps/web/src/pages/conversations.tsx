@@ -33,9 +33,10 @@ const ThreadItem = styled.div<{ $active: boolean }>`
     border-radius: 4px; padding: 0 5px; font-size: 10px;
   }
   .t-del {
-    border: none; background: transparent; padding: 2px 4px; font-size: 13px;
+    border: none; background: transparent; padding: 4px 8px; font-size: 16px;
     color: var(--text-muted); opacity: 0; transition: opacity .15s; flex-shrink: 0;
-    &:hover { color: var(--red); }
+    border-radius: var(--radius); cursor: pointer;
+    &:hover { color: var(--red); background: var(--bg-hover); }
   }
   &:hover .t-del { opacity: 1; }
 `

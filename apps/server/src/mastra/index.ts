@@ -32,6 +32,7 @@ export const noteAgent = new Agent({
 - list_notes / search_notes：浏览和搜索库里的笔记
 - read_note：读取笔记草稿内容，支持行范围读取
 - create_note / write_note / replace_in_note / insert_block：创建和修改笔记
+- web_search / web_fetch：联网搜索和读取网页全文（找资料、看新闻）。web_fetch 返回长文时用 start 翻页读取；如果触发真人验证或超时，如实告知用户。
 
 重要规则：
 1. 你的所有修改只写入「草稿」，用户确认后才会正式落库，所以可以放心修改，但要说明你改了什么。
