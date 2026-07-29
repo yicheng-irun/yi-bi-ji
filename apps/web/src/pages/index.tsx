@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
@@ -48,12 +48,46 @@ const Count = styled.div`
   font-size: 13px; color: var(--text-secondary); padding: 0 2px;
 `
 
+const ChipRow = styled.div`
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+`
+
+const Chip = styled.button<{ $on: boolean }>`
+  height: 28px; padding: 0 12px; font-size: 12px; border-radius: 14px;
+  background: ${(p) => (p.$on ? 'var(--accent-light)' : 'var(--bg-card)')};
+  border-color: ${(p) => (p.$on ? 'var(--accent)' : 'var(--border)')};
+  color: ${(p) => (p.$on ? 'var(--accent)' : 'var(--text-secondary)')};
+  font-weight: ${(p) => (p.$on ? 600 : 400)};
+  .n { opacity: .6; margin-left: 4px; }
+`
+
+const Tag = styled.span`
+  font-size: 11px; color: var(--text-muted); background: var(--bg-hover);
+  border-radius: 4px; padding: 1px 6px;
+`
+
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
+  const [tag, setTag] = useState('')
   const navigate = useNavigate()
+
+  const UNTAGGED = '__untagged__'
+
+  const tags = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const n of notes) for (const t of n.tags) m.set(t, (m.get(t) ?? 0) + 1)
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [notes])
+
+  const untaggedCount = useMemo(() => notes.filter((n) => n.tags.length === 0).length, [notes])
+
+  const visible = useMemo(
+    () => notes.filter((n) => !tag || (tag === UNTAGGED ? n.tags.length === 0 : n.tags.includes(tag))),
+    [notes, tag],
+  )
 
   const load = () =>
     api.listNotes()
@@ -92,14 +126,39 @@ export default function NotesPage() {
       {loading && <Loading />}
       {error && !loading && <Empty><p>{error}</p></Empty>}
 
-      {!loading && !error && notes.length > 0 && <Count>共 {notes.length} 篇笔记</Count>}
+      {!loading && !error && notes.length > 0 && (
+        <ChipRow>
+          <Chip $on={!tag} onClick={() => setTag('')}>
+            全部<span className="n">{notes.length}</span>
+          </Chip>
+          {tags.map(([t, n]) => (
+            <Chip key={t} $on={tag === t} onClick={() => setTag(tag === t ? '' : t)}>
+              #{t}<span className="n">{n}</span>
+            </Chip>
+          ))}
+          {untaggedCount > 0 && (
+            <Chip $on={tag === UNTAGGED} onClick={() => setTag(tag === UNTAGGED ? '' : UNTAGGED)}>
+              无标签<span className="n">{untaggedCount}</span>
+            </Chip>
+          )}
+        </ChipRow>
+      )}
 
-      {!loading && !error && notes.map((n) => (
+      {!loading && !error && visible.length > 0 && <Count>共 {visible.length} 篇笔记</Count>}
+
+      {!loading && !error && visible.map((n) => (
         <Card key={n.id} to={`/notes/${n.id}`}>
           <span className="icon">{n.hasChanges ? '📄' : '📋'}</span>
           <div className="info">
             <div className="title">{n.draftTitle || '(无标题)'}</div>
-            <div className="meta">{new Date(n.updatedAt).toLocaleString('zh-CN')}</div>
+            <div className="meta">
+              {new Date(n.updatedAt).toLocaleString('zh-CN')}
+              {n.tags.length > 0 && (
+                <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>
+                  {n.tags.map((t) => <Tag key={t}>#{t}</Tag>)}
+                </span>
+              )}
+            </div>
           </div>
           <div className="actions">
             {n.hasChanges && <Badge>未提交</Badge>}
@@ -112,6 +171,9 @@ export default function NotesPage() {
           <div className="icon">📝</div>
           <p>还没有笔记，在上方输入标题并回车创建第一篇</p>
         </Empty>
+      )}
+      {!loading && !error && notes.length > 0 && visible.length === 0 && (
+        <Empty><p>当前过滤条件下没有笔记</p></Empty>
       )}
     </Page>
   )

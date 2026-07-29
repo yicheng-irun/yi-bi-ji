@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { api, type Note } from '../../api/client'
@@ -24,20 +25,7 @@ const EditorPane = styled.div`
   min-width: 0; height: 100%;
 `
 
-const Toolbar = styled.div`
-  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-  flex-wrap: wrap; padding: 2px 0;
 
-  .version { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-  .status { font-size: 12px; display: flex; align-items: center; gap: 5px; }
-  .status .dot { width: 7px; height: 7px; border-radius: 50%; }
-  .spacer { flex: 1; }
-
-  .link-diff {
-    font-size: 12px; color: var(--orange); display: flex; align-items: center; gap: 4px;
-    &:hover { text-decoration: underline; }
-  }
-`
 
 const TitleInput = styled.input`
   font-size: 22px; font-weight: 700; width: 100%;
@@ -46,6 +34,28 @@ const TitleInput = styled.input`
   letter-spacing: -.01em;
   &:focus { border-bottom-color: var(--accent); box-shadow: none; }
   &::placeholder { font-weight: 400; color: var(--text-muted); }
+`
+
+const MetaRow = styled.div`
+  display: flex; gap: 10px; flex-shrink: 0; align-items: center;
+
+  .tags-input {
+    flex: 1; min-width: 0; height: 30px; font-size: 12px;
+    background: transparent; border: 1px solid transparent; border-radius: var(--radius);
+    color: var(--text-secondary); padding: 0 6px;
+    &:hover { border-color: var(--border); background: var(--bg-card); }
+    &:focus { border-color: var(--accent); background: var(--bg-card); box-shadow: none; }
+    &::placeholder { color: var(--text-muted); }
+  }
+
+  .version { font-size: 12px; color: var(--text-muted); font-weight: 500; flex-shrink: 0; }
+  .status { font-size: 12px; display: flex; align-items: center; gap: 5px; flex-shrink: 0; color: var(--text-secondary); }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  .link-diff {
+    font-size: 12px; color: var(--orange); display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    &:hover { text-decoration: underline; }
+  }
 `
 
 const TextareaWrapper = styled.div`
@@ -99,9 +109,16 @@ export default function NoteEditorPage() {
   const [remote, setRemote] = useState<RemoteDraft | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [tagsText, setTagsText] = useState('')
+  const [allTags, setAllTags] = useState<string[]>([])
   const [pendingRemote, setPendingRemote] = useState<RemoteDraft | null>(null)
   const [toast, setToast] = useState('')
   const [showChat, setShowChat] = useState(true)
+  const [slotEl, setSlotEl] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setSlotEl(document.getElementById('topbar-slot'))
+  }, [])
 
   const dirtyRef = useRef(false)
   const dirty = remote !== null && (title !== remote.draftTitle || content !== remote.draftContent)
@@ -118,8 +135,25 @@ export default function NoteEditorPage() {
       setRemote({ draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion })
       setTitle(n.draftTitle)
       setContent(n.draftContent)
+      setTagsText(n.tags.join(', '))
     }).catch(() => navigate('/'))
+    api.listNotes().then((list) => {
+      setAllTags([...new Set(list.flatMap((x) => x.tags))])
+    }).catch(() => {})
   }, [noteId, navigate])
+
+  const saveMeta = useCallback(async (tagsStr: string) => {
+    if (!note) return
+    const tags = tagsStr.split(/[,，]/).map((t) => t.trim()).filter(Boolean)
+    if (JSON.stringify(tags) === JSON.stringify(note.tags)) return
+    try {
+      const n = await api.updateMeta(noteId, { tags })
+      setNote(n)
+      showToast('标签已保存')
+    } catch {
+      showToast('标签保存失败')
+    }
+  }, [note, noteId, showToast])
 
   useEffect(() => {
     const es = new EventSource('/api/events')
@@ -180,19 +214,8 @@ export default function NoteEditorPage() {
 
   return (
     <Wrap>
-      <EditorPane>
-        <Toolbar>
-          <span className="version">v{remote?.draftContentVersion ?? '-'}</span>
-          <span className="status">
-            <span className="dot" style={{ background: dirty ? 'var(--orange)' : 'var(--green)' }} />
-            {dirty ? '未保存 (Ctrl+S)' : '已保存'}
-          </span>
-          {note.hasChanges && (
-            <Link className="link-diff" to={`/changes/${note.id}`}>
-              未提交的变更 →
-            </Link>
-          )}
-          <div className="spacer" />
+      {slotEl && createPortal(
+        <>
           <button onClick={() => setShowChat((s) => !s)}>
             {showChat ? '隐藏 AI' : 'AI 助手'}
           </button>
@@ -201,8 +224,10 @@ export default function NoteEditorPage() {
             await api.deleteNote(noteId)
             navigate('/')
           }}>删除</button>
-        </Toolbar>
-
+        </>,
+        slotEl,
+      )}
+      <EditorPane>
         {pendingRemote && (
           <AlertBar>
             <span>远端草稿有更新，与本地未保存内容冲突</span>
@@ -216,6 +241,30 @@ export default function NoteEditorPage() {
             </button>
           </AlertBar>
         )}
+
+        <MetaRow>
+          <input
+            className="tags-input"
+            list="tag-options"
+            value={tagsText}
+            placeholder="标签，用逗号分隔（可自由输入）"
+            onChange={(e) => setTagsText(e.target.value)}
+            onBlur={() => void saveMeta(tagsText)}
+          />
+          <datalist id="tag-options">
+            {allTags.map((t) => <option key={t} value={t} />)}
+          </datalist>
+          <span className="version">v{remote?.draftContentVersion ?? '-'}</span>
+          <span className="status">
+            <span className="dot" style={{ background: dirty ? 'var(--orange)' : 'var(--green)' }} />
+            {dirty ? '未保存 (Ctrl+S)' : '已保存'}
+          </span>
+          {note.hasChanges && (
+            <Link className="link-diff" to={`/changes/${note.id}`}>
+              未提交的变更 →
+            </Link>
+          )}
+        </MetaRow>
 
         <TitleInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="笔记标题" />
 

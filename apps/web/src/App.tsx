@@ -14,6 +14,7 @@ export default function App() {
           <NavLink to="/changes">变更</NavLink>
           <NavLink to="/conversations">会话</NavLink>
         </nav>
+        <div id="topbar-slot" className="slot" />
       </TopBar>
       <Main>
         <Suspense fallback={<Loading />}>{useRoutes(routes)}</Suspense>

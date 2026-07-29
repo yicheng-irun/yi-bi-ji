@@ -19,10 +19,30 @@ export async function getNoteOrThrow(id: number) {
 
 export function serializeNote(note: Note) {
   const n = note.toJSON()
+  let tags: string[] = []
+  try {
+    const parsed = JSON.parse(n.tags || '[]')
+    if (Array.isArray(parsed)) tags = parsed.filter((t): t is string => typeof t === 'string')
+  } catch {
+    // ignore malformed tags
+  }
   return {
     ...n,
+    tags,
     hasChanges: n.draftContent !== n.committedContent || n.draftTitle !== n.committedTitle,
   }
+}
+
+function normalizeTags(tags: string[]) {
+  return [...new Set(tags.map((t) => t.trim()).filter(Boolean))]
+}
+
+export async function updateNoteMeta(id: number, input: { tags?: string[] }) {
+  const note = await getNoteOrThrow(id)
+  if (input.tags !== undefined) note.tags = JSON.stringify(normalizeTags(input.tags))
+  await note.save()
+  emitNoteUpdated(note, 'user')
+  return serializeNote(note)
 }
 
 export async function listNotes() {
@@ -65,12 +85,17 @@ function makeSnippet(content: string, query: string) {
   return content.slice(start, start + 160)
 }
 
-export async function createNote(input: { title: string; content: string }, source: 'ai' | 'user', threadId?: string) {
+export async function createNote(
+  input: { title: string; content: string; tags?: string[] },
+  source: 'ai' | 'user',
+  threadId?: string,
+) {
   const note = await Note.create({
     committedTitle: '',
     committedContent: '',
     draftTitle: input.title,
     draftContent: input.content,
+    tags: JSON.stringify(normalizeTags(input.tags ?? [])),
   })
   if (source === 'ai') {
     await AiChangeLog.create({

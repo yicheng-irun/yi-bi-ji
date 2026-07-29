@@ -6,6 +6,7 @@ export interface Note {
   draftContent: string
   draftContentVersion: number
   draftTitleVersion: number
+  tags: string[]
   hasChanges: boolean
   createdAt: string
   updatedAt: string
@@ -86,6 +87,8 @@ export const api = {
   ) => request<Note>(`/api/notes/${id}/draft`, { method: 'PUT', body: JSON.stringify(data) }),
   commitNote: (id: number, content?: string) =>
     request<Note>(`/api/notes/${id}/commit`, { method: 'POST', body: JSON.stringify(content !== undefined ? { content } : {}) }),
+  updateMeta: (id: number, data: { tags?: string[] }) =>
+    request<Note>(`/api/notes/${id}/meta`, { method: 'PATCH', body: JSON.stringify(data) }),
   listChanges: () => request<ChangeItem[]>('/api/changes'),
   commitAll: () => request<Note[]>('/api/changes/commit-all', { method: 'POST', body: '{}' }),
   getDiff: (id: number) => request<NoteDiff>(`/api/changes/${id}/diff`),

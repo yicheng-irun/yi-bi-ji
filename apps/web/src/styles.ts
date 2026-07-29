@@ -124,6 +124,10 @@ export const TopBar = styled.header`
   nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
 
   .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  .slot { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .slot:empty { display: none; }
+  .slot button { height: 32px; font-size: 13px; padding: 0 14px; }
 `
 
 export const Main = styled.main`

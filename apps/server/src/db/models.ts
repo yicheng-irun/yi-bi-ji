@@ -9,6 +9,7 @@ export class Note extends Model<InferAttributes<Note>, InferCreationAttributes<N
   declare draftContent: string
   declare draftContentVersion: CreationOptional<number>
   declare draftTitleVersion: CreationOptional<number>
+  declare tags: CreationOptional<string>
   declare createdAt: CreationOptional<Date>
   declare updatedAt: CreationOptional<Date>
 }
@@ -22,6 +23,7 @@ Note.init(
     draftContent: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
     draftContentVersion: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
     draftTitleVersion: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    tags: { type: DataTypes.TEXT, allowNull: false, defaultValue: '[]' },
     createdAt: { type: DataTypes.DATE },
     updatedAt: { type: DataTypes.DATE },
   },

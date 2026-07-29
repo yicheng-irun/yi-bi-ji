@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock } from '../services/notes.js'
+import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, updateNoteMeta } from '../services/notes.js'
 import { fetchWebPage, searchWeb } from '../services/browser.js'
 
 export const listNotesTool = createTool({
@@ -40,11 +40,25 @@ export const createNoteTool = createTool({
   inputSchema: z.object({
     title: z.string().describe('笔记标题'),
     content: z.string().describe('markdown 正文'),
+    tags: z.array(z.string()).optional().describe('标签，0~5 个自由关键词，如：资讯、随想、稿子、计划、方法论、提示词'),
   }),
-  execute: async ({ title, content }, context) => {
+  execute: async ({ title, content, tags }, context) => {
     const threadId = (context?.requestContext?.get?.('threadId') as string | undefined) ?? undefined
-    const note = await createNote({ title, content }, 'ai', threadId)
+    const note = await createNote({ title, content, tags }, 'ai', threadId)
     return { ok: true, noteId: note.id, title: note.draftTitle }
+  },
+})
+
+export const setNoteTagsTool = createTool({
+  id: 'set_note_tags',
+  description: '设置一篇笔记的标签（整体替换）。标签是自由关键词，用于整理、归类笔记；先用 list_notes 看看已有标签名，尽量复用保持一致。',
+  inputSchema: z.object({
+    noteId: z.number().describe('笔记 id'),
+    tags: z.array(z.string()).describe('新的标签列表（整体替换，传空数组表示清空）'),
+  }),
+  execute: async ({ noteId, tags }) => {
+    const note = await updateNoteMeta(noteId, { tags })
+    return { ok: true, tags: note.tags }
   },
 })
 
@@ -132,6 +146,7 @@ export const noteTools = {
   write_note: writeNoteTool,
   replace_in_note: replaceInNoteTool,
   insert_block: insertBlockTool,
+  set_note_tags: setNoteTagsTool,
   web_search: webSearchTool,
   web_fetch: webFetchTool,
 }

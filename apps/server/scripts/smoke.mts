@@ -83,6 +83,16 @@ async function run() {
   })
   check('过期版本号保存返回 409', conflict.status === 409)
 
+  console.log('▶ 标签')
+  const meta = await api(`/api/notes/${noteId}/meta`, {
+    method: 'PATCH',
+    body: JSON.stringify({ tags: ['学习', ' 决策 ', '学习'] }),
+  })
+  check('设置标签(去重去空格)', meta.status === 200
+    && JSON.stringify((meta.body as { tags: string[] }).tags) === JSON.stringify(['学习', '决策']))
+  const metaBack = await api(`/api/notes/${noteId}`)
+  check('标签持久化', JSON.stringify((metaBack.body as { tags: string[] }).tags) === JSON.stringify(['学习', '决策']))
+
   console.log('▶ diff / 部分提交 / 全部提交')
   const diff = await api(`/api/changes/${noteId}/diff`)
   const hunks = (diff.body as { hunks: Hunk[] }).hunks

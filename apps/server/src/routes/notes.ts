@@ -7,6 +7,7 @@ import {
   saveDraftByUser,
   commitNote,
   deleteNote,
+  updateNoteMeta,
   ConflictError,
   NotFoundError,
 } from '../services/notes.js'
@@ -16,9 +17,18 @@ export const notesRoutes = new Hono()
 notesRoutes.get('/', async (c) => c.json(await listNotes()))
 
 notesRoutes.post('/', async (c) => {
-  const body = await c.req.json<{ title?: string; content?: string }>()
-  const note = await createNote({ title: body.title ?? '未命名', content: body.content ?? '' }, 'user')
+  const body = await c.req.json<{ title?: string; content?: string; tags?: string[] }>()
+  const note = await createNote(
+    { title: body.title ?? '未命名', content: body.content ?? '', tags: body.tags },
+    'user',
+  )
   return c.json(note, 201)
+})
+
+notesRoutes.patch('/:id/meta', async (c) => {
+  const body = await c.req.json<{ tags?: string[] }>()
+  const note = await updateNoteMeta(Number(c.req.param('id')), body)
+  return c.json(note)
 })
 
 notesRoutes.get('/:id', async (c) => {
