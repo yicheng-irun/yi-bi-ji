@@ -32,6 +32,25 @@ chatRoutes.post('/threads', async (c) => {
   return c.json(thread, 201)
 })
 
+chatRoutes.get('/threads/:id/context', async (c) => {
+  const threadId = c.req.param('id')
+  const result = await memory.recall({ threadId, resourceId: RESOURCE_ID })
+  let charCount = 0
+  for (const msg of result.messages) {
+    const parts = (msg as { content?: { parts?: Array<Record<string, unknown>> } }).content?.parts
+    if (Array.isArray(parts)) {
+      for (const p of parts) charCount += JSON.stringify(p).length
+    } else {
+      charCount += JSON.stringify(msg).length
+    }
+  }
+  return c.json({
+    messageCount: result.messages.length,
+    charCount,
+    estimatedTokens: Math.ceil(charCount / 2),
+  })
+})
+
 chatRoutes.delete('/threads/:id', async (c) => {
   await memory.deleteThread(c.req.param('id'))
   return c.json({ ok: true })
@@ -100,7 +119,7 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
       const result = await agent.stream(userMessage, {
         memory: { resource: RESOURCE_ID, thread: threadId },
         requestContext,
-        maxSteps: 15,
+        maxSteps: 30,
       })
 
       for await (const chunk of result.fullStream) {

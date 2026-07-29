@@ -71,6 +71,12 @@ const InputRow = styled.div`
   }
 `
 
+const ContextBar = styled.div`
+  display: flex; justify-content: flex-end; padding: 2px 14px;
+  font-size: 11px; color: var(--text-muted); background: var(--bg-hover);
+  border-top: 1px solid var(--border);
+`
+
 interface DisplayItem {
   role: string
   text: string
@@ -95,10 +101,21 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   const [items, setItems] = useState<DisplayItem[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [contextInfo, setContextInfo] = useState<{ messageCount: number; estimatedTokens: number } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const sendingRef = useRef(false)
+  const activeThreadRef = useRef('')
+
+  const refreshContext = (tid: string) => {
+    if (!tid) { setContextInfo(null); return }
+    api.getContext(tid)
+      .then((c) => { if (activeThreadRef.current === tid) setContextInfo(c) })
+      .catch(() => {})
+  }
 
   useEffect(() => {
+    activeThreadRef.current = threadId
+    refreshContext(threadId)
     if (!threadId) { setItems([]); return }
     if (sendingRef.current) return
     api.getMessages(threadId).then((res) => {
@@ -126,6 +143,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
         const t = await api.createThread(undefined, currentNoteId)
         onThreadCreated?.(t)
         tid = t.id
+        activeThreadRef.current = tid
       }
       await streamChat(tid, message, currentNoteId, {
         onText: (delta) => {
@@ -149,7 +167,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
           })
         },
         onToolResult: () => {},
-        onDone: () => { setStreaming(false); sendingRef.current = false },
+        onDone: () => { setStreaming(false); sendingRef.current = false; refreshContext(tid) },
         onError: (msg) => {
           setItems((arr) => {
             const next = [...arr]
@@ -203,6 +221,13 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
         )}
         <div ref={bottomRef} />
       </Messages>
+      {contextInfo && (
+        <ContextBar>
+          上下文 ~{contextInfo.estimatedTokens >= 1000
+            ? `${(contextInfo.estimatedTokens / 1000).toFixed(1)}k`
+            : contextInfo.estimatedTokens} tokens · {contextInfo.messageCount} 条消息
+        </ContextBar>
+      )}
       <InputRow>
         <textarea
           value={input} placeholder="和 AI 聊聊笔记…"

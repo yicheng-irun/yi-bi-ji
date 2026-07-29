@@ -14,5 +14,5 @@ export const env = {
   aiBaseURL: process.env.AI_BASE_URL ?? 'https://api.openai.com/v1',
   aiApiKey: process.env.AI_API_KEY ?? '',
   aiModel: process.env.AI_MODEL ?? 'gpt-4o-mini',
-  dataDir: path.resolve(process.cwd(), 'data'),
+  dataDir: path.resolve(process.env.DATA_DIR ?? path.join(process.cwd(), 'data')),
 }

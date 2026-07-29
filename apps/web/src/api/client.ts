@@ -96,6 +96,10 @@ export const api = {
     request<{ messages: ChatMessage[] }>(`/api/chat/threads/${threadId}/messages`),
   deleteThread: (threadId: string) =>
     request<{ ok: boolean }>(`/api/chat/threads/${threadId}`, { method: 'DELETE' }),
+  getContext: (threadId: string) =>
+    request<{ messageCount: number; charCount: number; estimatedTokens: number }>(
+      `/api/chat/threads/${threadId}/context`,
+    ),
 }
 
 export interface StreamHandlers {
