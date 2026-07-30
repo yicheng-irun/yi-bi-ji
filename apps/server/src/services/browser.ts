@@ -101,6 +101,67 @@ function looksLikeChallenge(title: string, text: string) {
   return CHALLENGE_PATTERNS.some((p) => probe.includes(p))
 }
 
+type Page = Awaited<ReturnType<Browser['newPage']>>
+
+async function waitForDomStable(page: Page, quietMs = 1200, maxWait = 8000) {
+  await page
+    .evaluate(
+      ([quiet, max]) =>
+        new Promise<void>((resolve) => {
+          const body = document.body
+          if (!body) return resolve()
+          let timer: ReturnType<typeof setTimeout>
+          const done = () => {
+            observer.disconnect()
+            clearTimeout(hard)
+            resolve()
+          }
+          const reset = () => {
+            clearTimeout(timer)
+            timer = setTimeout(done, quiet)
+          }
+          const observer = new MutationObserver(reset)
+          observer.observe(body, { childList: true, subtree: true, characterData: true })
+          const hard = setTimeout(done, max)
+          reset()
+        }),
+      [quietMs, maxWait] as const,
+    )
+    .catch(() => {})
+}
+
+async function autoScroll(page: Page) {
+  await page
+    .evaluate(async () => {
+      const step = Math.max(400, Math.floor(window.innerHeight * 0.8))
+      for (let i = 0; i < 25; i++) {
+        const before = window.scrollY
+        window.scrollBy(0, step)
+        await new Promise((r) => setTimeout(r, 200))
+        const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 10
+        if (atBottom && window.scrollY === before) break
+      }
+      window.scrollTo(0, 0)
+    })
+    .catch(() => {})
+}
+
+async function bodyTextLength(page: Page) {
+  return page.evaluate(() => document.body?.innerText.trim().length ?? 0).catch(() => 0)
+}
+
+/**
+ * 等动态页面内容就绪：networkidle（允许失败）→ DOM 稳定 →
+ * 内容不足时滚动触发懒加载再等一次稳定。各步均有上限，整体最坏 ~20s。
+ */
+async function waitForPageReady(page: Page) {
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+  await waitForDomStable(page)
+  if ((await bodyTextLength(page)) >= 2000) return
+  await autoScroll(page)
+  await waitForDomStable(page, 800, 4000)
+}
+
 export interface FetchResult {
   ok: boolean
   url: string
@@ -173,7 +234,7 @@ export async function fetchWebPage(url: string, start = 0, maxChars = 8000): Pro
       }
     }
 
-    await page.waitForTimeout(2000)
+    await waitForPageReady(page)
 
     let title = await page.title()
     let bodyText = await page.evaluate(() => document.body?.innerText ?? '')
@@ -268,7 +329,7 @@ export async function searchWeb(query: string, maxResults = 8): Promise<{ ok: bo
     const page = await context.newPage()
     try {
       await page.goto(engine.url(query), { waitUntil: 'domcontentloaded', timeout: 20000 })
-      await page.waitForTimeout(1500)
+      await waitForDomStable(page, 800, 5000)
       const results = await page.evaluate(engine.extract, maxResults)
       if (results.length > 0) return { ok: true, results }
       errors.push(`${engine.name}: 无结果`)

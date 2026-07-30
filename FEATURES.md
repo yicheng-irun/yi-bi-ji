@@ -43,7 +43,7 @@
   - `delete_note` — 标记笔记待删除（软删除，需变更页确认）
   - `set_note_tags` — 设置笔记标签
   - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
-  - `web_fetch` — 打开网页提取正文；JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
+  - `web_fetch` — 打开网页提取正文；动态页面就绪策略为 networkidle 短等 + DOM 稳定性（MutationObserver）+ 内容不足时滚动到底触发懒加载；JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表
 - 流式 SSE 输出：前端实时渲染 text-delta，展示 tool-call / tool-result 卡片
 
