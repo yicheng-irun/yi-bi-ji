@@ -3,23 +3,78 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 import type { Browser } from 'playwright'
+import fs from 'node:fs'
+import os from 'node:os'
 
 chromium.use(StealthPlugin())
 
 let browserPromise: Promise<Browser> | null = null
+let browserReady = false
+
+function detectBrowserChannel() {
+  if (os.platform() === 'win32') {
+    console.log('[browser] Windows 环境，将使用本机 Edge 浏览器（channel: msedge）')
+    return { channel: 'msedge' as const }
+  }
+
+  // 非 Windows：检测 Playwright 的 Chromium 是否已安装
+  try {
+    const execPath = chromium.executablePath()
+    if (!fs.existsSync(execPath)) {
+      console.warn('[browser] ⚠️  Playwright Chromium 未安装')
+      console.warn('[browser]    → 运行 npx playwright install chromium 安装')
+      console.warn('[browser]    → 或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 指向已有浏览器')
+    } else {
+      console.log(`[browser] 使用 Playwright Chromium: ${execPath}`)
+    }
+  } catch {
+    console.warn('[browser] ⚠️  无法检测 Chromium 安装状态，尝试启动时会再次检查')
+  }
+  return {}
+}
 
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
-    browserPromise = chromium.launch({
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-      ],
-    })
+    if (!browserReady) {
+      detectBrowserChannel()
+      browserReady = true
+    }
+
+    browserPromise = chromium
+      .launch({
+        ...detectBrowserChannel(),
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+        ],
+      })
+      .catch((err) => {
+        browserPromise = null
+        const message = err instanceof Error ? err.message : String(err)
+        const lower = message.toLowerCase()
+        if (
+          lower.includes('executable') ||
+          lower.includes('not found') ||
+          lower.includes('enoent') ||
+          lower.includes('could not find')
+        ) {
+          console.error('[browser] ❌ 浏览器启动失败：找不到可执行文件')
+          if (os.platform() === 'win32') {
+            console.error('[browser]    请确认本机已安装 Microsoft Edge')
+          } else {
+            console.error('[browser]    运行 npx playwright install chromium 安装 Chromium')
+            console.error('[browser]    或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 环境变量')
+          }
+        }
+        throw err
+      })
+
     const b = await browserPromise
+    console.log(`[browser] ✅ 浏览器已启动 (${b.version()})`)
     b.on('disconnected', () => {
+      console.warn('[browser] ⚠️  浏览器进程断开')
       browserPromise = null
     })
   }
