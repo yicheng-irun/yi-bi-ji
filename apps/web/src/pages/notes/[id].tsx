@@ -5,6 +5,7 @@ import styled, { keyframes } from 'styled-components'
 import { api, CLIENT_ID, type Note } from '../../api/client'
 import { Loading } from '../../components/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
+import { TagInput } from '../../components/TagInput'
 import { useDocTitle } from '../../hooks/use-doc-title'
 import { MarkdownPreview } from '../../components/MarkdownPreview'
 
@@ -44,15 +45,6 @@ const TitleInput = styled.input`
 
 const MetaRow = styled.div`
   display: flex; gap: 10px; flex-shrink: 0; align-items: center;
-
-  .tags-input {
-    flex: 1; min-width: 0; height: 30px; font-size: 12px;
-    background: transparent; border: 1px solid transparent; border-radius: var(--radius);
-    color: var(--text-secondary); padding: 0 6px;
-    &:hover { border-color: var(--border); background: var(--bg-card); }
-    &:focus { border-color: var(--accent); background: var(--bg-card); box-shadow: none; }
-    &::placeholder { color: var(--text-muted); }
-  }
 
   .version { font-size: 12px; color: var(--text-muted); font-weight: 500; flex-shrink: 0; }
   .status { font-size: 12px; display: flex; align-items: center; gap: 5px; flex-shrink: 0; color: var(--text-secondary); }
@@ -115,7 +107,7 @@ export default function NoteEditorPage() {
   const [remote, setRemote] = useState<RemoteDraft | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [tagsText, setTagsText] = useState('')
+  const [tags, setTags] = useState<string[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
   const [pendingRemote, setPendingRemote] = useState<RemoteDraft | null>(null)
   const [toast, setToast] = useState('')
@@ -144,25 +136,22 @@ export default function NoteEditorPage() {
       setRemote({ draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion })
       setTitle(n.draftTitle)
       setContent(n.draftContent)
-      setTagsText(n.tags.join(', '))
+      setTags(n.tags)
     }).catch(() => navigate('/'))
     api.listNotes().then((list) => {
       setAllTags([...new Set(list.flatMap((x) => x.tags))])
     }).catch(() => {})
   }, [noteId, navigate])
 
-  const saveMeta = useCallback(async (tagsStr: string) => {
-    if (!note) return
-    const tags = tagsStr.split(/[,，]/).map((t) => t.trim()).filter(Boolean)
-    if (JSON.stringify(tags) === JSON.stringify(note.tags)) return
+  const handleTagsChange = useCallback(async (next: string[]) => {
+    setTags(next)
     try {
-      const n = await api.updateMeta(noteId, { tags })
-      setNote(n)
-      showToast('标签已保存')
+      const n = await api.updateMeta(noteId, { tags: next })
+      setTags(n.tags)
     } catch {
       showToast('标签保存失败')
     }
-  }, [note, noteId, showToast])
+  }, [noteId, showToast])
 
   useEffect(() => {
     const es = new EventSource('/api/events')
@@ -267,17 +256,12 @@ export default function NoteEditorPage() {
         )}
 
         <MetaRow>
-          <input
-            className="tags-input"
-            list="tag-options"
-            value={tagsText}
-            placeholder="标签，用逗号分隔（可自由输入）"
-            onChange={(e) => setTagsText(e.target.value)}
-            onBlur={() => void saveMeta(tagsText)}
+          <TagInput
+            value={tags}
+            onChange={handleTagsChange}
+            suggestions={allTags}
+            placeholder="输入标签，回车确认"
           />
-          <datalist id="tag-options">
-            {allTags.map((t) => <option key={t} value={t} />)}
-          </datalist>
           <span className="version">v{remote?.draftContentVersion ?? '-'}</span>
           <span className="status">
             <span className="dot" style={{ background: dirty ? 'var(--orange)' : 'var(--green)' }} />
