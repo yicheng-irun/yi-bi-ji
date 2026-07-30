@@ -63,19 +63,28 @@ const Thinking = styled.div`
 const MAX_TEXTAREA_HEIGHT = 132
 
 const InputRow = styled.div`
-  display: flex; gap: 8px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
   border-top: 1px solid var(--border); background: var(--bg-hover);
   textarea {
     flex: 1; min-height: 44px; max-height: ${MAX_TEXTAREA_HEIGHT}px; resize: none;
     font-size: 14px; line-height: 1.4; box-sizing: border-box; overflow-y: auto;
     border-radius: var(--radius-lg);
     padding: 10px 14px;
+    &:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.08); }
   }
-  button {
-    width: 44px; height: 44px; border-radius: 50%; padding: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 18px;
-    flex-shrink: 0;
-  }
+`
+
+const SendButton = styled.button`
+  width: 36px; height: 36px; border-radius: 50%; padding: 0;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(79,70,229,.25);
+  transition: background .15s, transform .1s, box-shadow .15s;
+  svg { width: 17px; height: 17px; }
+
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+  &:active:not(:disabled) { transform: scale(.92); }
+  &:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
 `
 
 const ContextBar = styled.div`
@@ -275,9 +284,12 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
             if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); send() }
           }}
         />
-        <button className="btn-primary" disabled={streaming} onClick={send}>
-          ↑
-        </button>
+        <SendButton disabled={streaming} onClick={send} aria-label="发送">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5" />
+            <path d="M5 12l7-7 7 7" />
+          </svg>
+        </SendButton>
       </InputRow>
     </>
   )
