@@ -67,6 +67,9 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   const [scope, setScope] = useState<'note' | 'all'>(currentNoteId ? 'note' : 'all')
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const dragRef = useRef<{ startX: number; startW: number } | null>(null)
+  // 记录每个「笔记+范围」上下文是否已自动选中过最近会话，避免反复覆盖用户的手动选择
+  const autoSelected = useRef<Set<string>>(new Set())
+  const ctxKey = useRef<string | null>(null)
 
   const onResizeStart = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -90,6 +93,25 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   useEffect(() => {
     api.listThreads().then((res) => setThreads(res.threads)).catch(console.error)
   }, [])
+
+  // 打开笔记（或切换笔记/切换范围）时，自动选中最近的一条会话，而非新会话
+  useEffect(() => {
+    const key = `${scope}:${currentNoteId ?? 'none'}`
+    if (ctxKey.current !== key) {
+      ctxKey.current = key
+      autoSelected.current.delete(key)
+      setThreadId('') // 上下文变化时先清空，避免残留上一个笔记的会话
+    }
+    if (autoSelected.current.has(key)) return
+    const latest =
+      scope === 'note' && currentNoteId !== undefined
+        ? threads.find((t) => t.metadata?.originNoteId === currentNoteId)
+        : threads[0]
+    if (latest) {
+      setThreadId(latest.id)
+      autoSelected.current.add(key)
+    }
+  }, [threads, currentNoteId, scope])
 
   const visible = useMemo(
     () => (scope === 'note' && currentNoteId
