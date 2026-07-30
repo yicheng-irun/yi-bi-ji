@@ -5,45 +5,50 @@ import { parseHTML } from 'linkedom'
 import type { Browser } from 'playwright'
 import fs from 'node:fs'
 import os from 'node:os'
+import { env } from '../env.js'
 
 chromium.use(StealthPlugin())
 
 let browserPromise: Promise<Browser> | null = null
 let browserReady = false
 
-function detectBrowserChannel() {
-  if (os.platform() === 'win32') {
-    console.log('[browser] Windows 环境，将使用本机 Edge 浏览器（channel: msedge）')
-    return { channel: 'msedge' as const }
+function resolveBrowserConfig(): { channel?: 'msedge'; headless: boolean } {
+  const channel = os.platform() === 'win32' ? 'msedge' as const : undefined
+  const headless = env.browserHeadless
+
+  if (channel) {
+    console.log(`[browser] Windows 环境，使用本机 Edge（channel=msedge, headless=${headless}）`)
+  } else {
+    // 非 Windows：检测 Playwright 的 Chromium 是否已安装
+    try {
+      const execPath = chromium.executablePath()
+      if (!fs.existsSync(execPath)) {
+        console.warn('[browser] ⚠️  Playwright Chromium 未安装')
+        console.warn('[browser]    → 运行 npx playwright install chromium 安装')
+        console.warn('[browser]    → 或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 指向已有浏览器')
+      } else {
+        console.log(`[browser] 使用 Playwright Chromium (headless=${headless}): ${execPath}`)
+      }
+    } catch {
+      console.warn('[browser] ⚠️  无法检测 Chromium 安装状态，尝试启动时会再次检查')
+    }
   }
 
-  // 非 Windows：检测 Playwright 的 Chromium 是否已安装
-  try {
-    const execPath = chromium.executablePath()
-    if (!fs.existsSync(execPath)) {
-      console.warn('[browser] ⚠️  Playwright Chromium 未安装')
-      console.warn('[browser]    → 运行 npx playwright install chromium 安装')
-      console.warn('[browser]    → 或设置 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH 指向已有浏览器')
-    } else {
-      console.log(`[browser] 使用 Playwright Chromium: ${execPath}`)
-    }
-  } catch {
-    console.warn('[browser] ⚠️  无法检测 Chromium 安装状态，尝试启动时会再次检查')
-  }
-  return {}
+  return { channel, headless }
 }
 
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
     if (!browserReady) {
-      detectBrowserChannel()
       browserReady = true
     }
 
+    const config = resolveBrowserConfig()
+
     browserPromise = chromium
       .launch({
-        ...detectBrowserChannel(),
-        headless: true,
+        channel: config.channel,
+        headless: config.headless,
         args: [
           '--disable-blink-features=AutomationControlled',
           '--no-sandbox',
