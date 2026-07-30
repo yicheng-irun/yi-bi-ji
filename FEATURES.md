@@ -37,6 +37,10 @@
   - `write_note` — 全量覆盖草稿版本
   - `replace_in_note` — 字符串替换（要求唯一匹配，失败返回原因以便 AI 重试）
   - `insert_block` — 锚点插入区块：文末追加 / 指定标题后 / 指定文本后
+  - `delete_note` — 标记笔记待删除（软删除，需变更页确认）
+  - `set_note_tags` — 设置笔记标签
+  - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
+  - `web_fetch` — 打开网页提取正文；JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表
 - 流式 SSE 输出：前端实时渲染 text-delta，展示 tool-call / tool-result 卡片
 

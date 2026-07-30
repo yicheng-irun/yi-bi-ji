@@ -142,7 +142,7 @@ export const webSearchTool = createTool({
 export const webFetchTool = createTool({
   id: 'web_fetch',
   description:
-    '用浏览器打开一个网页并提取正文（可绕过很多反爬限制）。内容较长时返回前 maxChars 字符和总长度 totalChars，可用 start 参数翻页继续读。失败会返回原因（超时、真人验证、非网页内容等）。',
+    '用浏览器打开一个网页并提取正文（可绕过很多反爬限制）。HTML 页面提取正文；JSON/纯文本/XML 等接口响应直接返回原始内容（JSON 会格式化）。内容较长时返回前 maxChars 字符和总长度 totalChars，可用 start 参数翻页继续读。失败会返回原因（超时、真人验证、二进制内容等）。',
   inputSchema: z.object({
     url: z.string().describe('要打开的网页 URL'),
     start: z.number().optional().describe('从第几个字符开始读（用于长文翻页），默认 0'),

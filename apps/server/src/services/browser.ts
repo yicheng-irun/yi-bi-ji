@@ -137,8 +137,40 @@ export async function fetchWebPage(url: string, start = 0, maxChars = 8000): Pro
     if (status >= 400) return { ok: false, url, reason: `HTTP ${status}` }
 
     const contentType = response.headers()['content-type'] ?? ''
-    if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-      return { ok: false, url, reason: `不是网页内容（${contentType.split(';')[0]}），无法提取正文` }
+    const mime = contentType.split(';')[0].trim().toLowerCase()
+    const isHtml = !mime || mime.includes('text/html') || mime.includes('application/xhtml')
+
+    if (!isHtml) {
+      // 非 HTML：JSON / 纯文本 / XML 等文本类响应直接返回原始正文
+      const isTextLike =
+        mime.includes('json') ||
+        mime.startsWith('text/') ||
+        mime.includes('xml') ||
+        mime.includes('javascript') ||
+        mime.includes('yaml') ||
+        mime.includes('csv')
+      if (!isTextLike) {
+        return { ok: false, url, reason: `不是网页或文本内容（${mime}），无法提取正文` }
+      }
+      let raw = await response.text()
+      if (mime.includes('json')) {
+        try {
+          raw = JSON.stringify(JSON.parse(raw), null, 2)
+        } catch {
+          // 非法 JSON 就按原文返回
+        }
+      }
+      const text = raw.trim()
+      if (!text) return { ok: false, url, reason: '响应内容为空' }
+      const s = Math.max(0, start)
+      return {
+        ok: true,
+        url: page.url(),
+        title: `${mime} 响应`,
+        totalChars: text.length,
+        start: s,
+        content: text.slice(s, s + maxChars),
+      }
     }
 
     await page.waitForTimeout(2000)
