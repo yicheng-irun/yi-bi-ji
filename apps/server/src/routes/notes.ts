@@ -54,8 +54,8 @@ notesRoutes.post('/:id/commit', async (c) => {
 })
 
 notesRoutes.delete('/:id', async (c) => {
-  await deleteNote(Number(c.req.param('id')))
-  return c.json({ ok: true })
+  const note = await deleteNote(Number(c.req.param('id')))
+  return c.json(note)
 })
 
 export function noteErrorHandler(err: Error, c: Parameters<Parameters<Hono['onError']>[0]>[1]) {

@@ -55,6 +55,21 @@ const Hint = styled.div`
   border: 1px dashed var(--border);
 `
 
+const DeleteBanner = styled.div`
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: var(--radius-lg); font-size: 14px; color: var(--red);
+  .spacer { flex: 1; }
+`
+
+const DeletePreview = styled.pre`
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 14px 18px; background: var(--bg-card); max-height: 50vh; overflow: auto;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-all;
+  color: var(--text-secondary); text-decoration: line-through;
+`
+
 const BtnAccept = styled.button<{ $on: boolean }>`
   padding: 3px 10px; font-size: 12px; border-radius: 4px;
   background: ${(p) => (p.$on ? 'var(--green-bg)' : 'transparent')};
@@ -118,9 +133,38 @@ export default function ChangeDetailPage() {
     navigate('/changes')
   }
 
+  const confirmDelete = async () => {
+    if (!confirm(`确定永久删除笔记「${diff!.draftTitle || '(无标题)'}」？此操作不可恢复。`)) return
+    await api.commitNote(noteId)
+    navigate('/changes')
+  }
+
+  const undoDelete = async () => {
+    await api.rejectChange(noteId)
+    navigate('/changes')
+  }
+
   if (!diff) return error
     ? <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>{error}</p>
     : <Loading />
+
+  if (diff.deletedAt) {
+    return (
+      <Page>
+        <TopBar>
+          <button onClick={() => navigate('/changes')} style={{ border: 'none', padding: '6px 8px', background: 'transparent' }}>← 返回</button>
+          <h2 style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{diff.draftTitle || '(无标题)'}</h2>
+          <div className="spacer" />
+          <button onClick={undoDelete}>撤销删除</button>
+          <button className="btn-danger" onClick={confirmDelete}>确认删除</button>
+        </TopBar>
+        <DeleteBanner>
+          <span>🗑 该笔记已标记为待删除（{new Date(diff.deletedAt).toLocaleString('zh-CN')}）。点击「确认删除」将永久删除，或「撤销删除」恢复。</span>
+        </DeleteBanner>
+        {diff.committedContent && <DeletePreview>{diff.committedContent}</DeletePreview>}
+      </Page>
+    )
+  }
 
   return (
     <Page>

@@ -30,6 +30,11 @@ const Card = styled(Link)`
     background: var(--orange-bg); color: var(--orange);
     display: flex; align-items: center; justify-content: center; font-size: 16px;
   }
+  .indicator.del { background: #fef2f2; color: var(--red); }
+  .del-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+    background: #fef2f2; color: var(--red); border: 1px solid #fecaca; flex-shrink: 0;
+  }
   .info { flex: 1; min-width: 0; }
   .title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
@@ -55,7 +60,9 @@ export default function ChangesPage() {
   }, [])
 
   const commitAll = async () => {
-    if (!confirm(`确定提交全部 ${changes.length} 篇笔记的变更？落库后不可还原。`)) return
+    const delCount = changes.filter((c) => c.deletedAt).length
+    const delHint = delCount > 0 ? `其中 ${delCount} 篇将被永久删除。` : ''
+    if (!confirm(`确定提交全部 ${changes.length} 篇笔记的变更？${delHint}落库后不可还原。`)) return
     await api.commitAll()
     navigate('/')
   }
@@ -74,15 +81,20 @@ export default function ChangesPage() {
 
       {!loading && !error && changes.map((c) => (
         <Card key={c.id} to={`/changes/${c.id}`}>
-          <div className="indicator">△</div>
+          <div className={c.deletedAt ? 'indicator del' : 'indicator'}>{c.deletedAt ? '🗑' : '△'}</div>
           <div className="info">
-            <div className="title">{c.draftTitle || '(无标题)'}</div>
+            <div className="title" style={c.deletedAt ? { textDecoration: 'line-through', color: 'var(--text-secondary)' } : undefined}>
+              {c.draftTitle || '(无标题)'}
+            </div>
             <div className="sub">
-              {c.draftTitle !== c.committedTitle && c.committedTitle
-                ? `标题已改：${c.committedTitle} → ${c.draftTitle}`
-                : `${new Date(c.updatedAt).toLocaleString('zh-CN')}`}
+              {c.deletedAt
+                ? `标记删除于 ${new Date(c.deletedAt).toLocaleString('zh-CN')}`
+                : c.draftTitle !== c.committedTitle && c.committedTitle
+                  ? `标题已改：${c.committedTitle} → ${c.draftTitle}`
+                  : `${new Date(c.updatedAt).toLocaleString('zh-CN')}`}
             </div>
           </div>
+          {c.deletedAt && <span className="del-badge">待确认删除</span>}
         </Card>
       ))}
 

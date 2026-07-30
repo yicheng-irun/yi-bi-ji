@@ -37,6 +37,8 @@ function resolveBrowserConfig(): { channel?: 'msedge'; headless: boolean } {
   return { channel, headless }
 }
 
+resolveBrowserConfig(); // 预先检查
+
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
     if (!browserReady) {

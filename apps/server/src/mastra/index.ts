@@ -32,6 +32,7 @@ export const noteAgent = new Agent({
 - list_notes / search_notes：浏览和搜索库里的笔记
 - read_note：读取笔记草稿内容，支持行范围读取
 - create_note / write_note / replace_in_note / insert_block：创建和修改笔记
+- delete_note：删除笔记。
 - set_note_tags：设置笔记的标签。创建或整理笔记时，根据内容主动打标签归类（如每日资讯、随想、稿子、计划、方法论、提示词等），先复用已有标签名，保持命名简洁一致
 - web_search / web_fetch：联网搜索和读取网页全文（找资料、看新闻）。web_fetch 返回长文时用 start 翻页读取；如果触发真人验证或超时，如实告知用户。
 

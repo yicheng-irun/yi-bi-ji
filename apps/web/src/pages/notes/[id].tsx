@@ -220,9 +220,9 @@ export default function NoteEditorPage() {
             {showChat ? '隐藏 AI' : 'AI 助手'}
           </button>
           <button className="btn-danger" onClick={async () => {
-            if (!confirm('确定删除这篇笔记？')) return
+            if (!confirm('删除这篇笔记？将标记为待确认删除，需到「变更」页提交后才会真正删除。')) return
             await api.deleteNote(noteId)
-            navigate('/')
+            navigate('/changes')
           }}>删除</button>
         </>,
         slotEl,

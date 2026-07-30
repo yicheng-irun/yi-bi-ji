@@ -30,6 +30,13 @@ export function serializeNote(note: Note) {
     ...n,
     tags,
     hasChanges: n.draftContent !== n.committedContent || n.draftTitle !== n.committedTitle,
+    deletedAt: n.deletedAt ?? null,
+  }
+}
+
+function ensureNotDeleted(note: Note) {
+  if (note.deletedAt) {
+    throw new Error(`笔记「${note.draftTitle}」已被标记删除，无法修改。如需恢复，请先撤销删除。`)
   }
 }
 
@@ -129,6 +136,7 @@ export async function saveDraftByUser(
   input: { draftTitle?: string; draftContent?: string; baseContentVersion: number; baseTitleVersion: number },
 ) {
   const note = await getNoteOrThrow(id)
+  ensureNotDeleted(note)
   if (
     note.draftContentVersion !== input.baseContentVersion ||
     note.draftTitleVersion !== input.baseTitleVersion
@@ -153,6 +161,7 @@ async function writeDraftByAi(
   newContent: string,
   meta: { action: string; summary: string; threadId?: string },
 ) {
+  ensureNotDeleted(note)
   const before = note.draftContent
   note.draftContent = newContent
   note.draftContentVersion += 1
@@ -227,6 +236,38 @@ export async function aiInsertBlock(id: number, block: string, anchor: InsertAnc
   return { ok: true as const, note: serializeNote(note) }
 }
 
+export async function aiDeleteNote(id: number, threadId?: string) {
+  const note = await getNoteOrThrow(id)
+  ensureNotDeleted(note)
+  note.deletedAt = new Date()
+  await note.save()
+  await AiChangeLog.create({
+    noteId: note.id,
+    threadId: threadId ?? null,
+    action: 'delete_note',
+    summary: `删除笔记《${note.draftTitle}》`,
+    beforeContent: JSON.stringify({
+      draftTitle: note.draftTitle,
+      draftContent: note.draftContent,
+      committedTitle: note.committedTitle,
+      committedContent: note.committedContent,
+      tags: note.tags,
+    }),
+    afterContent: '',
+  })
+  emitNoteUpdated(note, 'ai')
+  return { ok: true as const, noteId: note.id, title: note.draftTitle }
+}
+
+export async function undoDeleteNote(id: number) {
+  const note = await getNoteOrThrow(id)
+  if (!note.deletedAt) throw new Error('该笔记未被标记删除，无需撤销')
+  note.deletedAt = null
+  await note.save()
+  emitNoteUpdated(note, 'user')
+  return serializeNote(note)
+}
+
 export async function readNote(id: number, startLine?: number, endLine?: number) {
   const note = await getNoteOrThrow(id)
   const lines = note.draftContent.split('\n')
@@ -240,6 +281,7 @@ export async function readNote(id: number, startLine?: number, endLine?: number)
     startLine: s,
     endLine: e,
     content: lines.slice(s - 1, e).join('\n'),
+    deletedAt: note.deletedAt ?? null,
   }
 }
 
@@ -250,6 +292,7 @@ export function getDiff(note: Note) {
     committedTitle: note.committedTitle,
     draftTitle: note.draftTitle,
     committedContent: note.committedContent,
+    deletedAt: note.deletedAt ?? null,
     hunks: patch.hunks,
   }
 }
@@ -257,17 +300,29 @@ export function getDiff(note: Note) {
 export async function listChanges() {
   const notes = await Note.findAll({ order: [['updatedAt', 'DESC']] })
   return notes
-    .filter((n) => n.draftContent !== n.committedContent || n.draftTitle !== n.committedTitle)
+    .filter(
+      (n) =>
+        n.deletedAt ||
+        n.draftContent !== n.committedContent ||
+        n.draftTitle !== n.committedTitle,
+    )
     .map((n) => ({
       id: n.id,
       committedTitle: n.committedTitle,
       draftTitle: n.draftTitle,
       updatedAt: n.updatedAt,
+      deletedAt: n.deletedAt ?? null,
     }))
 }
 
 export async function commitNote(id: number, content?: string) {
   const note = await getNoteOrThrow(id)
+  // 软删除的笔记 → 提交即硬删除
+  if (note.deletedAt) {
+    await note.destroy()
+    emitEvent({ type: 'note-deleted', noteId: id })
+    return { id, deleted: true }
+  }
   const finalContent = content !== undefined ? content : note.draftContent
   note.committedTitle = note.draftTitle
   note.committedContent = finalContent
@@ -290,8 +345,27 @@ export async function commitAll() {
   return results
 }
 
+export async function rejectChange(id: number) {
+  const note = await getNoteOrThrow(id)
+  // 撤销软删除
+  if (note.deletedAt) {
+    note.deletedAt = null
+  }
+  // 重置草稿到已提交版本
+  note.draftTitle = note.committedTitle
+  note.draftContent = note.committedContent
+  note.draftTitleVersion += 1
+  note.draftContentVersion += 1
+  await note.save()
+  emitNoteUpdated(note, 'user')
+  return serializeNote(note)
+}
+
 export async function deleteNote(id: number) {
   const note = await getNoteOrThrow(id)
-  await note.destroy()
-  emitEvent({ type: 'note-deleted', noteId: id })
+  if (note.deletedAt) return serializeNote(note)
+  note.deletedAt = new Date()
+  await note.save()
+  emitNoteUpdated(note, 'user')
+  return serializeNote(note)
 }

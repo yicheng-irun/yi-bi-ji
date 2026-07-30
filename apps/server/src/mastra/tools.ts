@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, updateNoteMeta } from '../services/notes.js'
+import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
 import { fetchWebPage, searchWeb } from '../services/browser.js'
 
 export const listNotesTool = createTool({
@@ -116,6 +116,19 @@ export const insertBlockTool = createTool({
   },
 })
 
+export const deleteNoteTool = createTool({
+  id: 'delete_note',
+  description: '删除一篇笔记。已有被标记删除的笔记时不可重复删除。',
+  inputSchema: z.object({
+    noteId: z.number().describe('要删除的笔记 id'),
+  }),
+  execute: async ({ noteId }, context) => {
+    const threadId = (context?.requestContext?.get?.('threadId') as string | undefined) ?? undefined
+    const result = await aiDeleteNote(noteId, threadId)
+    return { ok: true, noteId: result.noteId, title: result.title }
+  },
+})
+
 export const webSearchTool = createTool({
   id: 'web_search',
   description: '在互联网上搜索资料、新闻。返回标题、链接、摘要。找到相关结果后用 web_fetch 打开链接读取全文。',
@@ -146,6 +159,7 @@ export const noteTools = {
   write_note: writeNoteTool,
   replace_in_note: replaceInNoteTool,
   insert_block: insertBlockTool,
+  delete_note: deleteNoteTool,
   set_note_tags: setNoteTagsTool,
   web_search: webSearchTool,
   web_fetch: webFetchTool,

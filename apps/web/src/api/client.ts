@@ -8,6 +8,7 @@ export interface Note {
   draftTitleVersion: number
   tags: string[]
   hasChanges: boolean
+  deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -25,6 +26,7 @@ export interface NoteDiff {
   committedTitle: string
   draftTitle: string
   committedContent: string
+  deletedAt: string | null
   hunks: Hunk[]
 }
 
@@ -33,6 +35,7 @@ export interface ChangeItem {
   committedTitle: string
   draftTitle: string
   updatedAt: string
+  deletedAt: string | null
 }
 
 export interface Thread {
@@ -80,7 +83,7 @@ export const api = {
   listNotes: () => request<Note[]>('/api/notes'),
   getNote: (id: number) => request<Note>(`/api/notes/${id}`),
   createNote: (title: string) => request<Note>('/api/notes', { method: 'POST', body: JSON.stringify({ title }) }),
-  deleteNote: (id: number) => request<{ ok: boolean }>(`/api/notes/${id}`, { method: 'DELETE' }),
+  deleteNote: (id: number) => request<Note>(`/api/notes/${id}`, { method: 'DELETE' }),
   saveDraft: (
     id: number,
     data: { draftTitle: string; draftContent: string; baseContentVersion: number; baseTitleVersion: number },
@@ -91,6 +94,7 @@ export const api = {
     request<Note>(`/api/notes/${id}/meta`, { method: 'PATCH', body: JSON.stringify(data) }),
   listChanges: () => request<ChangeItem[]>('/api/changes'),
   commitAll: () => request<Note[]>('/api/changes/commit-all', { method: 'POST', body: '{}' }),
+  rejectChange: (id: number) => request<Note>(`/api/changes/${id}/reject`, { method: 'POST', body: '{}' }),
   getDiff: (id: number) => request<NoteDiff>(`/api/changes/${id}/diff`),
   listThreads: () => request<Thread[] | { threads: Thread[] }>('/api/chat/threads'),
   createThread: (title?: string, noteId?: number) =>

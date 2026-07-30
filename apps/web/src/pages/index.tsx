@@ -38,6 +38,11 @@ const Badge = styled.span`
   background: var(--orange-bg); color: var(--orange); border: 1px solid #fcd34d;
 `
 
+const DelBadge = styled.span`
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  background: #fef2f2; color: var(--red); border: 1px solid #fecaca;
+`
+
 const Empty = styled.div`
   text-align: center; padding: 60px 20px; color: var(--text-secondary);
   .icon { font-size: 48px; margin-bottom: 12px; }
@@ -147,10 +152,12 @@ export default function NotesPage() {
       {!loading && !error && visible.length > 0 && <Count>共 {visible.length} 篇笔记</Count>}
 
       {!loading && !error && visible.map((n) => (
-        <Card key={n.id} to={`/notes/${n.id}`}>
-          <span className="icon">{n.hasChanges ? '📄' : '📋'}</span>
+        <Card key={n.id} to={n.deletedAt ? `/changes/${n.id}` : `/notes/${n.id}`}>
+          <span className="icon">{n.deletedAt ? '🗑' : n.hasChanges ? '📄' : '📋'}</span>
           <div className="info">
-            <div className="title">{n.draftTitle || '(无标题)'}</div>
+            <div className="title" style={n.deletedAt ? { textDecoration: 'line-through', color: 'var(--text-secondary)' } : undefined}>
+              {n.draftTitle || '(无标题)'}
+            </div>
             <div className="meta">
               {new Date(n.updatedAt).toLocaleString('zh-CN')}
               {n.tags.length > 0 && (
@@ -161,7 +168,9 @@ export default function NotesPage() {
             </div>
           </div>
           <div className="actions">
-            {n.hasChanges && <Badge>未提交</Badge>}
+            {n.deletedAt
+              ? <DelBadge>待确认删除</DelBadge>
+              : n.hasChanges && <Badge>未提交</Badge>}
           </div>
         </Card>
       ))}
