@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
 import { Loading } from '../components/Loading'
+import { useDocTitle } from '../hooks/use-doc-title'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -78,6 +79,8 @@ export default function NotesPage() {
   const [title, setTitle] = useState('')
   const [tag, setTag] = useState('')
   const navigate = useNavigate()
+
+  useDocTitle('笔记')
 
   const UNTAGGED = '__untagged__'
 

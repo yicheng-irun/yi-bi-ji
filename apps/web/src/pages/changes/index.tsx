@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type ChangeItem } from '../../api/client'
 import { Loading } from '../../components/Loading'
+import { useDocTitle } from '../../hooks/use-doc-title'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -51,6 +52,8 @@ export default function ChangesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+
+  useDocTitle('变更')
 
   useEffect(() => {
     api.listChanges()

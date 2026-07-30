@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Hunk, type NoteDiff } from '../../api/client'
 import { Loading } from '../../components/Loading'
+import { useDocTitle } from '../../hooks/use-doc-title'
 
 const Page = styled.div`
   max-width: 900px; margin: 0 auto;
@@ -108,6 +109,8 @@ export default function ChangeDetailPage() {
 
   const [diff, setDiff] = useState<NoteDiff | null>(null)
   const [error, setError] = useState('')
+
+  useDocTitle(diff ? `变更：${diff.draftTitle || '(无标题)'}` : null)
   const [accepted, setAccepted] = useState<boolean[]>([])
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { ChatPanel } from '../components/ChatPanel'
 import { Loading } from '../components/Loading'
+import { useDocTitle } from '../hooks/use-doc-title'
 
 const Wrap = styled.div`
   max-width: 1100px; margin: 0 auto;
@@ -58,6 +59,8 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeId, setActiveId] = useState('')
+
+  useDocTitle('AI 会话')
 
   useEffect(() => {
     api.listThreads().then((res) => {

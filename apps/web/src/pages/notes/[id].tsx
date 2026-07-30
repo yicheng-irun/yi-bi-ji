@@ -5,6 +5,7 @@ import styled, { keyframes } from 'styled-components'
 import { api, type Note } from '../../api/client'
 import { Loading } from '../../components/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
+import { useDocTitle } from '../../hooks/use-doc-title'
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translate(-50%, 10px); }
@@ -115,6 +116,8 @@ export default function NoteEditorPage() {
   const [toast, setToast] = useState('')
   const [showChat, setShowChat] = useState(true)
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null)
+
+  useDocTitle(note ? (title || '(无标题)') : null)
 
   useEffect(() => {
     setSlotEl(document.getElementById('topbar-slot'))
