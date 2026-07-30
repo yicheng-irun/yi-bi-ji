@@ -126,6 +126,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
           let tid = threadIdRef.current
           if (!tid) {
             const t = await api.createThread(undefined, noteIdRef.current)
+            tid = t.id
             threadIdRef.current = t.id
             onThreadCreatedRef.current?.(t)
           }
