@@ -173,13 +173,26 @@ async function run() {
       body: JSON.stringify({ message: '用 read_note 读一下当前笔记，然后回复我一个字：好', currentNoteId: nid }),
     })
     const text = await res.text()
-    for (const chunk of text.split('\n\n')) {
-      const ev = chunk.split('\n').find((l) => l.startsWith('event:'))
-      if (ev) events.push(ev.slice(6).trim())
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
+      if (data === '[DONE]') { events.push('[DONE]'); continue }
+      try {
+        const parsed = JSON.parse(data) as { type?: string }
+        if (parsed.type) events.push(parsed.type)
+      } catch { /* ignore */ }
     }
-    check('流式返回 text 事件', events.includes('text'), events.slice(0, 10))
+    check('流式返回 text-delta 事件', events.includes('text-delta'), events.slice(0, 10))
     check('agent 调用了 read_note 工具', text.includes('"toolName":"read_note"'))
-    check('流正常结束 done', events.includes('done'))
+    check('流正常结束 [DONE]', events.includes('[DONE]'))
+
+    const history = await api(`/api/chat/threads/${tid}/messages`)
+    const msgs = (history.body as { messages: Array<{ role: string; parts: Array<{ type: string }> }> }).messages
+    check(
+      '消息已持久化（含工具调用）',
+      msgs.length >= 2 && msgs.some((m) => m.role === 'assistant' && m.parts.some((p) => p.type === 'tool-read_note')),
+      msgs.map((m) => [m.role, m.parts.map((p) => p.type)]),
+    )
 
     const ctx = await api(`/api/chat/threads/${tid}/context`)
     check('上下文统计接口', ctx.status === 200 && (ctx.body as { messageCount: number }).messageCount >= 2, ctx.body)

@@ -64,7 +64,7 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     api.listThreads().then((res) => {
-      const list = Array.isArray(res) ? res : res.threads ?? []
+      const list = res.threads
       setThreads(list)
       if (list.length > 0) setActiveId(list[0].id)
     }).catch((e) => {

@@ -1,3 +1,5 @@
+import type { UIMessage } from 'ai'
+
 export interface Note {
   id: number
   committedTitle: string
@@ -41,24 +43,9 @@ export interface ChangeItem {
 export interface Thread {
   id: string
   title: string
-  resourceId: string
   createdAt: string
   updatedAt: string
   metadata?: { originNoteId?: number }
-}
-
-export interface ChatPart {
-  type: 'text' | 'tool'
-  text?: string
-  toolName?: string
-  state?: string
-  args?: unknown
-}
-
-export interface ChatMessage {
-  id?: string
-  role: string
-  parts: ChatPart[]
 }
 
 /** 当前前端实例的唯一 id，用于识别并忽略 SSE 中自己产生的回声事件 */
@@ -102,85 +89,15 @@ export const api = {
   commitAll: () => request<Note[]>('/api/changes/commit-all', { method: 'POST', body: '{}' }),
   rejectChange: (id: number) => request<Note>(`/api/changes/${id}/reject`, { method: 'POST', body: '{}' }),
   getDiff: (id: number) => request<NoteDiff>(`/api/changes/${id}/diff`),
-  listThreads: () => request<Thread[] | { threads: Thread[] }>('/api/chat/threads'),
+  listThreads: () => request<{ threads: Thread[] }>('/api/chat/threads'),
   createThread: (title?: string, noteId?: number) =>
     request<Thread>('/api/chat/threads', { method: 'POST', body: JSON.stringify({ title, noteId }) }),
   getMessages: (threadId: string) =>
-    request<{ messages: ChatMessage[] }>(`/api/chat/threads/${threadId}/messages`),
+    request<{ messages: UIMessage[] }>(`/api/chat/threads/${threadId}/messages`),
   deleteThread: (threadId: string) =>
     request<{ ok: boolean }>(`/api/chat/threads/${threadId}`, { method: 'DELETE' }),
   getContext: (threadId: string) =>
     request<{ messageCount: number; charCount: number; estimatedTokens: number }>(
       `/api/chat/threads/${threadId}/context`,
     ),
-}
-
-export interface StreamHandlers {
-  onText: (delta: string) => void
-  onToolCall: (toolName: string, args: unknown) => void
-  onToolResult: (toolName: string, result: unknown) => void
-  onDone: () => void
-  onError: (message: string) => void
-}
-
-export async function streamChat(
-  threadId: string,
-  message: string,
-  currentNoteId: number | undefined,
-  handlers: StreamHandlers,
-  signal?: AbortSignal,
-) {
-  const res = await fetch(`/api/chat/threads/${threadId}/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, currentNoteId }),
-    signal,
-  })
-  if (!res.ok || !res.body) {
-    handlers.onError(`HTTP ${res.status}`)
-    return
-  }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let idx
-    while ((idx = buffer.indexOf('\n\n')) >= 0) {
-      const rawEvent = buffer.slice(0, idx)
-      buffer = buffer.slice(idx + 2)
-      let event = 'message'
-      let data = ''
-      for (const line of rawEvent.split('\n')) {
-        if (line.startsWith('event:')) event = line.slice(6).trim()
-        else if (line.startsWith('data:')) data += line.slice(5).trim()
-      }
-      let parsed: Record<string, unknown> = {}
-      try {
-        parsed = data ? JSON.parse(data) : {}
-      } catch {
-        continue
-      }
-      switch (event) {
-        case 'text':
-          handlers.onText(String(parsed.delta ?? ''))
-          break
-        case 'tool-call':
-          handlers.onToolCall(String(parsed.toolName ?? ''), parsed.args)
-          break
-        case 'tool-result':
-          handlers.onToolResult(String(parsed.toolName ?? ''), parsed.result)
-          break
-        case 'done':
-          handlers.onDone()
-          break
-        case 'error':
-          handlers.onError(String(parsed.message ?? 'unknown error'))
-          break
-      }
-    }
-  }
-  handlers.onDone()
 }

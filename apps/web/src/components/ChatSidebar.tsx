@@ -88,10 +88,7 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   }
 
   useEffect(() => {
-    api.listThreads().then((res) => {
-      const list = Array.isArray(res) ? res : res.threads ?? []
-      setThreads(list)
-    }).catch(console.error)
+    api.listThreads().then((res) => setThreads(res.threads)).catch(console.error)
   }, [])
 
   const visible = useMemo(

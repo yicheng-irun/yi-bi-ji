@@ -69,3 +69,51 @@ AiChangeLog.init(
     ],
   },
 )
+
+export class ChatThread extends Model<InferAttributes<ChatThread>, InferCreationAttributes<ChatThread>> {
+  declare id: string
+  declare title: CreationOptional<string>
+  declare metadata: CreationOptional<string>
+  declare createdAt: CreationOptional<Date>
+  declare updatedAt: CreationOptional<Date>
+}
+
+ChatThread.init(
+  {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    title: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+    metadata: { type: DataTypes.TEXT, allowNull: false, defaultValue: '{}' },
+    createdAt: { type: DataTypes.DATE },
+    updatedAt: { type: DataTypes.DATE },
+  },
+  {
+    sequelize,
+    tableName: 'chat_threads',
+    indexes: [{ name: 'idx_chat_threads_updated_at', fields: ['updatedAt'] }],
+  },
+)
+
+export class ChatMessage extends Model<InferAttributes<ChatMessage>, InferCreationAttributes<ChatMessage>> {
+  declare id: string
+  declare threadId: string
+  declare role: string
+  declare parts: CreationOptional<string>
+  declare createdAt: CreationOptional<Date>
+  declare updatedAt: CreationOptional<Date>
+}
+
+ChatMessage.init(
+  {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    threadId: { type: DataTypes.STRING, allowNull: false },
+    role: { type: DataTypes.STRING, allowNull: false },
+    parts: { type: DataTypes.TEXT, allowNull: false, defaultValue: '[]' },
+    createdAt: { type: DataTypes.DATE },
+    updatedAt: { type: DataTypes.DATE },
+  },
+  {
+    sequelize,
+    tableName: 'chat_messages',
+    indexes: [{ name: 'idx_chat_messages_thread_id', fields: ['threadId'] }],
+  },
+)

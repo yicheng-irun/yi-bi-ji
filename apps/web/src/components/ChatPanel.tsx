@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { api, streamChat, type Thread } from '../api/client'
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from 'ai'
+import { api, type Thread } from '../api/client'
 
 const Messages = styled.div`
   flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px;
@@ -81,12 +83,6 @@ const ContextBar = styled.div`
   border-top: 1px solid var(--border);
 `
 
-interface DisplayItem {
-  role: string
-  text: string
-  tools: string[]
-}
-
 export const toolNames: Record<string, string> = {
   list_notes: '列笔记', search_notes: '搜索', read_note: '读取',
   create_note: '新建', write_note: '全量写', replace_in_note: '替换',
@@ -101,15 +97,65 @@ interface ChatPanelProps {
   onThreadCreated?: (thread: Thread) => void
 }
 
+function messageText(m: UIMessage): string {
+  return m.parts.filter(isTextUIPart).map((p) => p.text).join('')
+}
+
+function messageTools(m: UIMessage): string[] {
+  return m.parts.filter(isToolUIPart).map((p) => getToolName(p))
+}
+
 export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPanelProps) {
-  const [items, setItems] = useState<DisplayItem[]>([])
   const [input, setInput] = useState('')
-  const [streaming, setStreaming] = useState(false)
   const [contextInfo, setContextInfo] = useState<{ messageCount: number; estimatedTokens: number } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const sendingRef = useRef(false)
-  const activeThreadRef = useRef('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const threadIdRef = useRef(threadId)
+  threadIdRef.current = threadId
+  const noteIdRef = useRef(currentNoteId)
+  noteIdRef.current = currentNoteId
+  const onThreadCreatedRef = useRef(onThreadCreated)
+  onThreadCreatedRef.current = onThreadCreated
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat/threads',
+        prepareSendMessagesRequest: async ({ messages, headers, credentials }) => {
+          let tid = threadIdRef.current
+          if (!tid) {
+            const t = await api.createThread(undefined, noteIdRef.current)
+            threadIdRef.current = t.id
+            onThreadCreatedRef.current?.(t)
+          }
+          return {
+            api: `/api/chat/threads/${tid}/stream`,
+            headers,
+            credentials,
+            body: { messages: messages.slice(-1), currentNoteId: noteIdRef.current },
+          }
+        },
+      }),
+    [],
+  )
+
+  const refreshContext = (tid: string) => {
+    if (!tid) { setContextInfo(null); return }
+    api.getContext(tid)
+      .then((c) => { if (threadIdRef.current === tid) setContextInfo(c) })
+      .catch(() => {})
+  }
+
+  const { messages, sendMessage, setMessages, status, error } = useChat({
+    transport,
+    onFinish: () => refreshContext(threadIdRef.current),
+    onError: (e) => console.error(e),
+  })
+
+  const streaming = status === 'submitted' || status === 'streaming'
+  const streamingRef = useRef(streaming)
+  streamingRef.current = streaming
 
   useEffect(() => {
     const el = textareaRef.current
@@ -118,115 +164,62 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
     el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [input])
 
-  const refreshContext = (tid: string) => {
-    if (!tid) { setContextInfo(null); return }
-    api.getContext(tid)
-      .then((c) => { if (activeThreadRef.current === tid) setContextInfo(c) })
-      .catch(() => {})
-  }
-
   useEffect(() => {
-    activeThreadRef.current = threadId
     refreshContext(threadId)
-    if (!threadId) { setItems([]); return }
-    if (sendingRef.current) return
+    if (!threadId) { setMessages([]); return }
+    if (streamingRef.current) return
     api.getMessages(threadId).then((res) => {
-      if (sendingRef.current) return
-      setItems(res.messages.map((m) => ({
-        role: m.role ?? 'assistant',
-        text: m.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join(''),
-        tools: m.parts.filter((p) => p.type === 'tool').map((p) => p.toolName ?? ''),
-      })))
+      if (streamingRef.current) return
+      setMessages(res.messages)
     }).catch(console.error)
-  }, [threadId])
+  }, [threadId, setMessages])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [items])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  const send = async () => {
-    const message = input.trim()
-    if (!message || streaming) return
+  const send = () => {
+    const text = input.trim()
+    if (!text || streaming) return
     setInput('')
-    setStreaming(true)
-    sendingRef.current = true
-    setItems((arr) => [...arr, { role: 'user', text: message, tools: [] }, { role: 'assistant', text: '', tools: [] }])
-    try {
-      let tid = threadId
-      if (!tid) {
-        const t = await api.createThread(undefined, currentNoteId)
-        onThreadCreated?.(t)
-        tid = t.id
-        activeThreadRef.current = tid
-      }
-      await streamChat(tid, message, currentNoteId, {
-        onText: (delta) => {
-          setItems((arr) => {
-            if (arr.length === 0) return arr
-            const next = [...arr]
-            const last = { ...next[next.length - 1], tools: [...(next[next.length - 1].tools || [])] }
-            last.text += delta
-            next[next.length - 1] = last
-            return next
-          })
-        },
-        onToolCall: (toolName) => {
-          setItems((arr) => {
-            if (arr.length === 0) return arr
-            const next = [...arr]
-            const last = { ...next[next.length - 1], tools: [...(next[next.length - 1].tools || [])] }
-            last.tools.push(toolName)
-            next[next.length - 1] = last
-            return next
-          })
-        },
-        onToolResult: () => {},
-        onDone: () => { setStreaming(false); sendingRef.current = false; refreshContext(tid) },
-        onError: (msg) => {
-          setItems((arr) => {
-            const next = [...arr]
-            const last = { ...next[next.length - 1] }
-            last.text += `\n[错误] ${msg}`
-            next[next.length - 1] = last
-            return next
-          })
-          setStreaming(false)
-          sendingRef.current = false
-        },
-      })
-    } catch (err) {
-      console.error(err)
-      setStreaming(false)
-      sendingRef.current = false
-    }
+    void sendMessage({ text })
   }
 
   return (
     <>
       <Messages>
-        {items.map((m, i) => (
-          <div key={i} style={{ display: 'contents' }}>
-            {m.tools.length > 0 && (
-              <ToolRow style={m.role === 'user' ? { flexDirection: 'row-reverse' } : undefined}>
-                <div className="chip">
-                  <span className="icon">🔧</span>
-                  <span>{m.tools.map((t) => toolNames[t] || t).join(' → ')}</span>
-                </div>
-              </ToolRow>
-            )}
-            {m.text && (
-              <MessageGroup $role={m.role}>
-                <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
-                <Bubble $role={m.role}>{m.text}</Bubble>
-              </MessageGroup>
-            )}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const text = messageText(m)
+          const tools = messageTools(m)
+          return (
+            <div key={m.id} style={{ display: 'contents' }}>
+              {tools.length > 0 && (
+                <ToolRow style={m.role === 'user' ? { flexDirection: 'row-reverse' } : undefined}>
+                  <div className="chip">
+                    <span className="icon">🔧</span>
+                    <span>{tools.map((t) => toolNames[t] || t).join(' → ')}</span>
+                  </div>
+                </ToolRow>
+              )}
+              {text && (
+                <MessageGroup $role={m.role}>
+                  <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
+                  <Bubble $role={m.role}>{text}</Bubble>
+                </MessageGroup>
+              )}
+            </div>
+          )
+        })}
         {streaming && (
           <Thinking>
             <div className="dots"><span /><span /><span /></div>
             思考中…
           </Thinking>
         )}
-        {items.length === 0 && !streaming && (
+        {status === 'error' && (
+          <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center' }}>
+            [错误] {error?.message ?? '请求失败'}
+          </p>
+        )}
+        {messages.length === 0 && !streaming && (
           <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
             发送消息开始对话
           </p>
@@ -246,10 +239,10 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
           value={input} placeholder="和 AI 聊聊笔记…"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); void send() }
+            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); send() }
           }}
         />
-        <button className="btn-primary" disabled={streaming} onClick={() => void send()}>
+        <button className="btn-primary" disabled={streaming} onClick={send}>
           ↑
         </button>
       </InputRow>

@@ -32,7 +32,7 @@
 
 - 右侧侧边栏，与当前正在编辑的笔记联动（告知 AI 当前笔记 id）
 - 对话支持多线程，在 `/conversations` 页面可审计历史会话
-- Mastra Agent，提供以下工具：
+- AI SDK v7 `ToolLoopAgent`（OpenAI 兼容端点），提供以下工具：
   - `list_notes` — 列出所有笔记
   - `search_notes` — 关键词模糊搜索（标题 + 正文，分页）
   - `read_note` — 读取笔记草稿，支持行范围（`startLine` / `endLine`）按需读取，避免全量塞入上下文
@@ -45,11 +45,12 @@
   - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
   - `web_fetch` — 打开网页提取正文；动态页面就绪策略为 networkidle 短等 + DOM 稳定性（MutationObserver）+ 内容不足时滚动到底触发懒加载；JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表
-- 流式 SSE 输出：前端实时渲染 text-delta，展示 tool-call / tool-result 卡片
+- 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片
 
 ## 会话持久化
 
-- Mastra Memory + LibSQLStore（`data/mastra.db`）持久化对话消息
+- 会话与消息持久化在业务库（`data/notes.db`）的 `chat_threads` / `chat_messages` 表中，消息以 UIMessage JSON（parts）存储
+- 发给模型的上下文截取最近 40 条消息
 - 支持多线程对话管理、重新进入历史对话继续沟通
 - 便于审计 AI 行为和排查错误
 

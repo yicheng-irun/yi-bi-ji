@@ -1,12 +1,12 @@
 # bi-ji
 
-基于 Mastra 的 agent 笔记系统。pnpm workspace 大仓。
+基于 Vercel AI SDK v7（ToolLoopAgent + useChat）的 agent 笔记系统。pnpm workspace 大仓。
 
 > **功能开发或修改后，必须同步更新 [`FEATURES.md`](./FEATURES.md)**，保持特性说明与实际实现一致。
 
 ## 结构
 
-- `apps/server` — Hono + Mastra + Sequelize(SQLite)，端口 15201
+- `apps/server` — Hono + AI SDK v7 + Sequelize(SQLite)，端口 15201
 - `apps/web` — React + TS + styled-components + Vite + vite-plugin-pages，端口 15200（/api 代理到 15201）
 
 ## 常用命令
@@ -28,8 +28,7 @@ pnpm test               # smoke 测试（apps/server/scripts/smoke.mts，自起�
 
 ## 数据
 
-- `apps/server/data/notes.db` — 业务库（Sequelize，启动时 `sync({alter:true})`，索引需具名）
-- `apps/server/data/mastra.db` — Mastra 会话记忆（LibSQLStore）
+- `apps/server/data/notes.db` — 业务库（Sequelize，启动时 `sync({alter:true})`，索引需具名）；会话存 `chat_threads` / `chat_messages` 表（UIMessage JSON）
 
 ## 核心概念
 
@@ -37,3 +36,4 @@ pnpm test               # smoke 测试（apps/server/scripts/smoke.mts，自起�
 - diff = 当前草稿 vs 上次提交版本（行级，`diff` 库 structuredPatch）；前端 hunk 级 Accept/Reject 后重组内容提交
 - 保存草稿带 baseVersion 校验，冲突返回 409；`/api/events` 全局 SSE 同步草稿变更
 - AI 工具只改 draft 并写 `ai_change_logs` 审计表
+- AI 对话：`src/agent/` 定义 ToolLoopAgent + 工具（threadId 闭包注入）；`POST /api/chat/threads/:id/stream` 走 AI SDK UI Message Stream（`createAgentUIStreamResponse`），`onEnd` 落库新消息；前端 `useChat` + `DefaultChatTransport`（`prepareSendMessagesRequest` 懒建 thread 并注入 currentNoteId）；上下文窗口为最近 40 条消息
