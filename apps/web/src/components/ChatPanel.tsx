@@ -57,11 +57,15 @@ const Thinking = styled.div`
   .dots span:nth-child(3) { animation-delay: .4s; }
 `
 
+const MAX_TEXTAREA_HEIGHT = 132
+
 const InputRow = styled.div`
   display: flex; gap: 8px; padding: 10px 12px;
   border-top: 1px solid var(--border); background: var(--bg-hover);
   textarea {
-    flex: 1; height: 44px; resize: none; font-size: 14px; border-radius: var(--radius-lg);
+    flex: 1; min-height: 44px; max-height: ${MAX_TEXTAREA_HEIGHT}px; resize: none;
+    font-size: 14px; line-height: 1.4; box-sizing: border-box; overflow-y: auto;
+    border-radius: var(--radius-lg);
     padding: 10px 14px;
   }
   button {
@@ -105,6 +109,14 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   const bottomRef = useRef<HTMLDivElement>(null)
   const sendingRef = useRef(false)
   const activeThreadRef = useRef('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
+  }, [input])
 
   const refreshContext = (tid: string) => {
     if (!tid) { setContextInfo(null); return }
@@ -230,6 +242,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
       )}
       <InputRow>
         <textarea
+          ref={textareaRef}
           value={input} placeholder="和 AI 聊聊笔记…"
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
