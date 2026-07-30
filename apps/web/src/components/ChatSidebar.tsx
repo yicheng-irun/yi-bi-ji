@@ -1,13 +1,42 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { ChatPanel } from './ChatPanel'
 
+const DEFAULT_WIDTH = 400
+const MIN_WIDTH = 320
+const MAX_WIDTH = 800
+
+const Container = styled.div`
+  flex-shrink: 0; height: 100%; position: relative;
+`
+
 const Pane = styled.aside`
-  width: 400px; flex-shrink: 0; height: 100%;
+  width: 100%; height: 100%;
   display: flex; flex-direction: column;
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);
+`
+
+const ResizeHandle = styled.div`
+  /* 向左移动半个间隙(20/2=10px)，使中心线落在笔记与聊天之间的空白处正中 */
+  position: absolute; left: -10px; top: 0; bottom: 0; width: 12px;
+  transform: translateX(-50%);
+  cursor: col-resize; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  &::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; transform: translateX(-50%);
+    background: transparent; transition: background .15s;
+  }
+  &:hover::before { background: var(--accent); }
+  .grip {
+    opacity: 0; transition: opacity .15s; pointer-events: none;
+    color: var(--accent); font-size: 14px; line-height: 1;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 1px;
+  }
+  &:hover .grip { opacity: 1; }
 `
 
 const Header = styled.div`
@@ -36,6 +65,27 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   const [threads, setThreads] = useState<Thread[]>([])
   const [threadId, setThreadId] = useState('')
   const [scope, setScope] = useState<'note' | 'all'>(currentNoteId ? 'note' : 'all')
+  const [width, setWidth] = useState(DEFAULT_WIDTH)
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const onResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragRef.current = { startX: e.clientX, startW: width }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragRef.current.startW + (dragRef.current.startX - ev.clientX)))
+      setWidth(next)
+    }
+    const onUp = () => {
+      dragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = ''
+    }
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   useEffect(() => {
     api.listThreads().then((res) => {
@@ -57,8 +107,12 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
   }
 
   return (
-    <Pane>
-      <Header>
+    <Container style={{ width }}>
+      <ResizeHandle onMouseDown={onResizeStart} title="拖动调整宽度">
+        <span className="grip">⋮</span>
+      </ResizeHandle>
+      <Pane>
+        <Header>
         <select value={threadId} onChange={(e) => setThreadId(e.target.value)}>
           <option value="">新对话</option>
           {visible.map((t) => (
@@ -94,6 +148,7 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
           setThreadId(t.id)
         }}
       />
-    </Pane>
+      </Pane>
+    </Container>
   )
 }
