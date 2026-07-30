@@ -128,6 +128,19 @@ export const TopBar = styled.header`
   .slot { margin-left: auto; display: flex; align-items: center; gap: 8px; }
   .slot:empty { display: none; }
   .slot button { height: 32px; font-size: 13px; padding: 0 14px; }
+
+  .slot .mode-group {
+    display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; background: var(--bg-card);
+  }
+  .slot .mode-group button {
+    border: none; border-radius: 0; background: transparent; color: var(--text-secondary);
+    padding: 0 12px; height: 32px; font-size: 13px; font-weight: 500;
+  }
+  .slot .mode-group button + button { border-left: 1px solid var(--border); }
+  .slot .mode-group button:hover { background: var(--bg-hover); }
+  .slot .mode-group button.active { background: var(--accent); color: #fff; }
+  .slot .mode-group button.active:hover { background: var(--accent-hover); }
 `
 
 export const Main = styled.main`

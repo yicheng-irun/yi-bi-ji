@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "marked": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",

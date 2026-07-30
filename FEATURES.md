@@ -4,6 +4,7 @@
 
 - 笔记列表：浏览、新建笔记（回车建）
 - markdown 纯文本编辑器（等宽字体），Ctrl+S 保存草稿
+- 编辑器三种视图模式（顶部导航栏插槽中，位于「隐藏 AI / 删除」按钮左侧的分段控件切换）：`编辑`（默认，纯 markdown 文本编辑）、`双列`（左编辑 + 右实时预览并排）、`预览`（纯 markdown 渲染预览，不含编辑器）；预览由 `marked` 渲染（`apps/web/src/components/MarkdownPreview.tsx`）
 - 浏览器标签页标题（`document.title`）随页面变化：笔记编辑页显示笔记标题（随输入实时更新），变更详情页显示「变更：xxx」，列表/变更/会话页显示对应页面名，格式为 `xxx - bi-ji`
 - 站点 favicon 为手绘 SVG（`apps/web/public/favicon.svg`）：靛蓝渐变圆角底 + 折角便签纸 + 铅笔，与应用主色一致
 - 删除笔记为两阶段：删除操作仅标记 `deletedAt`（待确认删除），需到变更页（`/changes`）「确认删除」后才真正落库删除；也可「撤销删除」恢复

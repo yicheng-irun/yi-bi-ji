@@ -6,6 +6,7 @@ import { api, CLIENT_ID, type Note } from '../../api/client'
 import { Loading } from '../../components/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
 import { useDocTitle } from '../../hooks/use-doc-title'
+import { MarkdownPreview } from '../../components/MarkdownPreview'
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translate(-50%, 10px); }
@@ -24,6 +25,10 @@ const Wrap = styled.div`
 const EditorPane = styled.div`
   flex: 1; display: flex; flex-direction: column; gap: 10px;
   min-width: 0; height: 100%;
+`
+
+const Body = styled.div`
+  flex: 1; min-height: 0; display: flex; gap: 12px;
 `
 
 
@@ -116,6 +121,7 @@ export default function NoteEditorPage() {
   const [toast, setToast] = useState('')
   const [showChat, setShowChat] = useState(true)
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null)
+  const [mode, setMode] = useState<'edit' | 'split' | 'preview'>('edit')
 
   useDocTitle(note ? (title || '(无标题)') : null)
 
@@ -229,6 +235,11 @@ export default function NoteEditorPage() {
     <Wrap>
       {slotEl && createPortal(
         <>
+          <div className="mode-group" role="group" aria-label="视图模式">
+            <button className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')}>编辑</button>
+            <button className={mode === 'split' ? 'active' : ''} onClick={() => setMode('split')}>双列</button>
+            <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>预览</button>
+          </div>
           <button onClick={() => setShowChat((s) => !s)}>
             {showChat ? '隐藏 AI' : 'AI 助手'}
           </button>
@@ -281,13 +292,18 @@ export default function NoteEditorPage() {
 
         <TitleInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="笔记标题" />
 
-        <TextareaWrapper>
-          <ContentArea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="用 markdown 开始书写…"
-          />
-        </TextareaWrapper>
+        <Body>
+          {mode !== 'preview' && (
+            <TextareaWrapper>
+              <ContentArea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="用 markdown 开始书写…"
+              />
+            </TextareaWrapper>
+          )}
+          {mode !== 'edit' && <MarkdownPreview content={content} />}
+        </Body>
       </EditorPane>
       {showChat && <ChatSidebar currentNoteId={noteId} />}
       {toast && <Toast>{toast}</Toast>}
