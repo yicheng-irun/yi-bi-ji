@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from 'ai'
@@ -31,6 +31,11 @@ const Bubble = styled.div<{ $role: string }>`
   color: var(--text);
 `
 
+const blink = keyframes`
+  0%,100% { opacity: 1; }
+  50% { opacity: .3; }
+`
+
 const ToolRow = styled.div`
   display: flex; align-items: center; gap: 6px; padding: 4px 0;
   font-size: 12px; color: var(--text-secondary);
@@ -41,11 +46,7 @@ const ToolRow = styled.div`
     border-radius: 6px; padding: 4px 10px;
   }
   .chip .icon { font-size: 13px; }
-`
-
-const blink = keyframes`
-  0%,100% { opacity: 1; }
-  50% { opacity: .3; }
+  .chip.running .icon { animation: ${blink} 1.2s ease infinite; }
 `
 
 const Thinking = styled.div`
@@ -97,12 +98,60 @@ interface ChatPanelProps {
   onThreadCreated?: (thread: Thread) => void
 }
 
-function messageText(m: UIMessage): string {
-  return m.parts.filter(isTextUIPart).map((p) => p.text).join('')
-}
-
-function messageTools(m: UIMessage): string[] {
-  return m.parts.filter(isToolUIPart).map((p) => getToolName(p))
+function renderMessageParts(m: UIMessage): ReactNode[] {
+  const nodes: ReactNode[] = []
+  let textBuf = ''
+  let textStart = -1
+  let firstBubble = true
+  const flushText = () => {
+    if (!textBuf) return
+    const t = textBuf
+    textBuf = ''
+    const key = `t-${textStart}`
+    nodes.push(
+      <MessageGroup key={key} $role={m.role}>
+        {firstBubble ? (
+          <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
+        ) : (
+          <span style={{ width: 30, flexShrink: 0 }} />
+        )}
+        <Bubble $role={m.role}>{t}</Bubble>
+      </MessageGroup>,
+    )
+    firstBubble = false
+  }
+  m.parts.forEach((part, i) => {
+    if (isTextUIPart(part) && part.text) {
+      if (textStart < 0) textStart = i
+      textBuf += part.text
+    } else if (isToolUIPart(part)) {
+      flushText()
+      const name = toolNames[getToolName(part)] || getToolName(part)
+      const running = part.state !== 'output-available' && part.state !== 'output-error'
+      nodes.push(
+        <ToolRow key={`tool-${i}`} style={m.role === 'user' ? { flexDirection: 'row-reverse' } : undefined}>
+          <div className={running ? 'chip running' : 'chip'}>
+            <span className="icon">🔧</span>
+            <span>{name}</span>
+          </div>
+        </ToolRow>,
+      )
+    }
+  })
+  flushText()
+  if (nodes.length === 0) {
+    nodes.push(
+      <MessageGroup key="empty" $role={m.role}>
+        {firstBubble ? (
+          <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
+        ) : (
+          <span style={{ width: 30, flexShrink: 0 }} />
+        )}
+        <Bubble $role={m.role} />,
+      </MessageGroup>,
+    )
+  }
+  return nodes
 }
 
 export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPanelProps) {
@@ -187,28 +236,11 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   return (
     <>
       <Messages>
-        {messages.map((m) => {
-          const text = messageText(m)
-          const tools = messageTools(m)
-          return (
-            <div key={m.id} style={{ display: 'contents' }}>
-              {tools.length > 0 && (
-                <ToolRow style={m.role === 'user' ? { flexDirection: 'row-reverse' } : undefined}>
-                  <div className="chip">
-                    <span className="icon">🔧</span>
-                    <span>{tools.map((t) => toolNames[t] || t).join(' → ')}</span>
-                  </div>
-                </ToolRow>
-              )}
-              {text && (
-                <MessageGroup $role={m.role}>
-                  <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
-                  <Bubble $role={m.role}>{text}</Bubble>
-                </MessageGroup>
-              )}
-            </div>
-          )
-        })}
+        {messages.map((m) => (
+          <div key={m.id} style={{ display: 'contents' }}>
+            {renderMessageParts(m)}
+          </div>
+        ))}
         {streaming && (
           <Thinking>
             <div className="dots"><span /><span /><span /></div>
