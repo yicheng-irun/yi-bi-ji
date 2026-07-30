@@ -119,7 +119,7 @@ export async function createNote(
   return serializeNote(note)
 }
 
-function emitNoteUpdated(note: Note, source: 'ai' | 'user') {
+function emitNoteUpdated(note: Note, source: 'ai' | 'user', clientId?: string) {
   emitEvent({
     type: 'note-updated',
     noteId: note.id,
@@ -128,12 +128,19 @@ function emitNoteUpdated(note: Note, source: 'ai' | 'user') {
     draftContentVersion: note.draftContentVersion,
     draftTitleVersion: note.draftTitleVersion,
     source,
+    clientId,
   })
 }
 
 export async function saveDraftByUser(
   id: number,
-  input: { draftTitle?: string; draftContent?: string; baseContentVersion: number; baseTitleVersion: number },
+  input: {
+    draftTitle?: string
+    draftContent?: string
+    baseContentVersion: number
+    baseTitleVersion: number
+    clientId?: string
+  },
 ) {
   const note = await getNoteOrThrow(id)
   ensureNotDeleted(note)
@@ -152,7 +159,7 @@ export async function saveDraftByUser(
     note.draftTitleVersion += 1
   }
   await note.save()
-  emitNoteUpdated(note, 'user')
+  emitNoteUpdated(note, 'user', input.clientId)
   return serializeNote(note)
 }
 

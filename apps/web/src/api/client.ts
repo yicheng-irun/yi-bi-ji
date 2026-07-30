@@ -61,6 +61,12 @@ export interface ChatMessage {
   parts: ChatPart[]
 }
 
+/** 当前前端实例的唯一 id，用于识别并忽略 SSE 中自己产生的回声事件 */
+export const CLIENT_ID =
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `c-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -87,7 +93,7 @@ export const api = {
   saveDraft: (
     id: number,
     data: { draftTitle: string; draftContent: string; baseContentVersion: number; baseTitleVersion: number },
-  ) => request<Note>(`/api/notes/${id}/draft`, { method: 'PUT', body: JSON.stringify(data) }),
+  ) => request<Note>(`/api/notes/${id}/draft`, { method: 'PUT', body: JSON.stringify({ ...data, clientId: CLIENT_ID }) }),
   commitNote: (id: number, content?: string) =>
     request<Note>(`/api/notes/${id}/commit`, { method: 'POST', body: JSON.stringify(content !== undefined ? { content } : {}) }),
   updateMeta: (id: number, data: { tags?: string[] }) =>

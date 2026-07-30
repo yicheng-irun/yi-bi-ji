@@ -8,6 +8,8 @@ export interface NoteUpdatedEvent {
   draftContentVersion: number
   draftTitleVersion: number
   source: 'ai' | 'user'
+  /** 发起本次变更的前端实例 id，用于前端忽略自己产生的回声事件 */
+  clientId?: string
 }
 
 export interface NoteCreatedEvent {

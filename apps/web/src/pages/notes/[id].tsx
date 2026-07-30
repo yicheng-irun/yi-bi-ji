@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { api, type Note } from '../../api/client'
+import { api, CLIENT_ID, type Note } from '../../api/client'
 import { Loading } from '../../components/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
 import { useDocTitle } from '../../hooks/use-doc-title'
@@ -161,8 +161,11 @@ export default function NoteEditorPage() {
   useEffect(() => {
     const es = new EventSource('/api/events')
     es.addEventListener('note-updated', (e) => {
-      const evt = JSON.parse((e as MessageEvent).data) as RemoteDraft & { noteId: number }
+      const evt = JSON.parse((e as MessageEvent).data) as RemoteDraft & { noteId: number; clientId?: string }
       if (evt.noteId !== noteId) return
+      // 自己保存动作产生的回声事件：本地状态已由保存请求的响应更新，直接忽略，
+      // 避免 SSE 先于 HTTP 响应到达时误判为"远端有更新"
+      if (evt.clientId === CLIENT_ID) return
       const next: RemoteDraft = { draftTitle: evt.draftTitle, draftContent: evt.draftContent, draftContentVersion: evt.draftContentVersion, draftTitleVersion: evt.draftTitleVersion }
       if (!dirtyRef.current) {
         setRemote(next); setTitle(next.draftTitle); setContent(next.draftContent); setPendingRemote(null)
@@ -181,9 +184,14 @@ export default function NoteEditorPage() {
     return () => es.close()
   }, [noteId])
 
+  const savingRef = useRef(false)
+
   const save = useCallback(async (base?: RemoteDraft) => {
     const r = base ?? remote
     if (!r) return
+    // 上一次保存尚未返回时忽略本次触发，避免用旧 base 版本发起请求造成假冲突（409）
+    if (savingRef.current) return
+    savingRef.current = true
     try {
       const n = await api.saveDraft(noteId, {
         draftTitle: title, draftContent: content,
@@ -202,6 +210,8 @@ export default function NoteEditorPage() {
       } else {
         showToast('保存失败')
       }
+    } finally {
+      savingRef.current = false
     }
   }, [noteId, remote, title, content, showToast])
 

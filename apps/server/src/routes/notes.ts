@@ -42,6 +42,7 @@ notesRoutes.put('/:id/draft', async (c) => {
     draftContent?: string
     baseContentVersion: number
     baseTitleVersion: number
+    clientId?: string
   }>()
   const note = await saveDraftByUser(Number(c.req.param('id')), body)
   return c.json(note)
