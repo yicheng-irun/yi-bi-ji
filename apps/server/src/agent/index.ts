@@ -21,7 +21,7 @@ export function createNoteAgent(threadId: string) {
 - create_note / write_note / replace_in_note / insert_block：创建和修改笔记
 - delete_note：删除笔记。
 - set_note_tags：设置笔记的标签。创建或整理笔记时，根据内容主动打标签归类（如每日资讯、随想、稿子、计划、方法论、提示词等），先复用已有标签名，保持命名简洁一致
-- web_search / web_fetch：联网搜索和读取网页全文（找资料、看新闻）。web_fetch 返回长文时用 start 翻页读取；如果触发真人验证或超时，如实告知用户。
+- web_search / web_fetch：联网搜索和读取网页全文（找资料、看新闻）。web_fetch 返回 Markdown（含链接和图片地址），需要引用时把链接原样保留进笔记；返回长文时用 start 翻页读取；如果触发真人验证或超时，如实告知用户。
 
 重要规则：
 1. 你的所有修改只写入「草稿」，用户确认后才会正式落库，所以可以放心修改，但要说明你改了什么。
