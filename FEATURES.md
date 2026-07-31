@@ -51,6 +51,7 @@
 - 支持展示 AI 的推理/思考过程：reasoning 内容以可折叠的「💭 思考过程」卡片呈现（带字数统计），流式过程中高亮并标注「思考过程…」，默认展开，点击标题可折叠/展开
 - AI 回复正文按 markdown 渲染（`apps/web/src/components/chat/ChatMarkdown.tsx`，`marked`），针对窄侧边栏做紧凑化：标题缩到与正文接近（h1≈1.1em、h2≈1.05em、h3+≈1em）、去除标题下划线，代码块/表格横向滚动（`overflow-x: auto`）并限制最大宽度，`overflow-wrap/word-break` 防止长内容撑破气泡
 - 工具调用卡片可点击展开/收起（`MessageList.tsx` 的 `ToolCard`）：默认收起为工具名小条，展开后展示入参 JSON、执行结果（文本/JSON/子代理过程）与错误信息；子代理运行中自动展开以实时展示进度，普通工具保持收起
+- 自定义下拉选择组件 `Select`（`apps/web/src/components/Select.tsx`）：替代原生 `<select>`，自绘 SVG 箭头图标，菜单为自绘浮层（点击外部/Esc 关闭、方向键 + Enter 选择、悬停高亮），用于 AI 侧边栏顶部的会话切换下拉
 
 ## 会话持久化
 

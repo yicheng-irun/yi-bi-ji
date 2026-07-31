@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { ChatPanel } from './ChatPanel'
+import { Select } from './Select'
 
 const DEFAULT_WIDTH = 600
 const MIN_WIDTH = 320
@@ -43,10 +44,6 @@ const Header = styled.div`
   display: flex; gap: 8px; padding: 10px 12px;
   border-bottom: 1px solid var(--border); background: var(--bg-hover); align-items: center;
 
-  select {
-    flex: 1; height: 34px; font-size: 13px; background: var(--bg-card);
-    border-radius: var(--radius); cursor: pointer; min-width: 0;
-  }
   button { height: 34px; padding: 0 14px; font-size: 12px; flex-shrink: 0; }
 `
 
@@ -132,12 +129,12 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
       </ResizeHandle>
       <Pane>
         <Header>
-          <select value={threadId} onChange={(e) => setThreadId(e.target.value)}>
-            <option value="">新对话</option>
-            {visible.map((t) => (
-              <option key={t.id} value={t.id}>{threadLabel(t)}</option>
-            ))}
-          </select>
+          <Select
+            value={threadId}
+            onChange={setThreadId}
+            placeholder="新对话"
+            options={visible.map((t) => ({ value: t.id, label: threadLabel(t) }))}
+          />
           {currentNoteId !== undefined && (
             <FilterToggle>
               <button className={scope === 'note' ? 'on' : ''} onClick={() => { setScope('note'); setThreadId('') }}>本笔记</button>
