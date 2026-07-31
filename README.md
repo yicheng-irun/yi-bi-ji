@@ -12,7 +12,7 @@
 
 ### 项目的作用
 
-- **对于学习者**：它是理解 AI Agent（Mastra）、工具调用（tool calling）、会话记忆（Memory）、流式输出与多端实时同步的活样例。通过阅读代码，可以看到一个 Agent 如何被赋予读写笔记的能力，并通过工具与业务数据交互。
+- **对于学习者**：它是理解 AI Agent（Vercel AI SDK v7）、工具调用（tool calling）、会话记忆、流式输出与多端实时同步的活样例。通过阅读代码，可以看到一个 Agent 如何被赋予读写笔记的能力，并通过工具与业务数据交互。
 - **对于使用者**：它也是一个真正能用的笔记工具——支持 Markdown 编辑、草稿/正式双版本管理、行级 diff 提交、以及内置一个能帮你查资料、写笔记、改笔记的 AI 助手。
 
 简单说：**用 AI 造一个带 AI 助手的笔记软件，既是学习 Agent 的练习场，也是验证学习成果的成品。**
@@ -21,9 +21,9 @@
 
 ## 项目概览
 
-基于 [Mastra](https://mastra.ai/) 的 Agent 笔记系统，采用 pnpm workspace 大仓结构。
+基于 [Vercel AI SDK v7](https://sdk.vercel.ai/)（ToolLoopAgent + useChat）的 Agent 笔记系统，采用 pnpm workspace 大仓结构。
 
-- `apps/server` — Hono + Mastra + Sequelize(SQLite)，端口 `15201`
+- `apps/server` — Hono + Vercel AI SDK v7 + Sequelize(SQLite)，端口 `15201`
 - `apps/web` — React + TypeScript + styled-components + Vite + vite-plugin-pages，端口 `15200`（`/api` 代理到 `15201`）
 
 ### 核心概念
@@ -41,7 +41,7 @@
 - 草稿与提交：双版本管理、版本冲突检测、SSE 实时同步、单篇/全部提交、放弃变更。
 - 行级 Diff 与 Hunk 视图：类 GitHub PR 的 hunk 区块，支持按块接受/拒绝。
 - AI 助手：与当前笔记联动的右侧侧边栏，内置 `list_notes` / `search_notes` / `read_note` / `write_note` / `replace_in_note` / `insert_block` / `web_search` / `web_fetch` 等工具，流式输出并展示工具调用卡片。
-- 会话持久化：Mastra Memory + LibSQLStore，支持多线程对话与审计。
+- 会话持久化：会话存 `chat_threads` / `chat_messages` 表（UIMessage JSON），支持多线程对话与审计。
 - 实时同步：事件总线 + SSE，列表、编辑器、变更列表多端实时响应。
 
 ---
@@ -82,8 +82,7 @@ pnpm test               # smoke 测试（apps/server/scripts/smoke.mts，自起�
 
 ### 数据存储
 
-- `apps/server/data/notes.db` — 业务库（Sequelize，启动时 `sync({alter:true})`，索引需具名）
-- `apps/server/data/mastra.db` — Mastra 会话记忆（LibSQLStore）
+- `apps/server/data/notes.db` — 业务库（Sequelize，启动时 `sync({alter:true})`，索引需具名）；会话存 `chat_threads` / `chat_messages` 表（UIMessage JSON）
 
 ---
 
@@ -92,7 +91,7 @@ pnpm test               # smoke 测试（apps/server/scripts/smoke.mts，自起�
 ```
 .
 ├── apps/
-│   ├── server/        # Hono + Mastra + Sequelize 后端服务
+│   ├── server/        # Hono + Vercel AI SDK v7 + Sequelize 后端服务
 │   └── web/           # React + Vite 前端
 ├── FEATURES.md        # 功能特性详细说明
 ├── AGENTS.md          # 项目开发指引（给 AI 看）
