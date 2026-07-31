@@ -1,15 +1,8 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { Avatar, roleAvatars } from './styles'
-
-const ReasoningWrap = styled.div<{ $role: string }>`
-  display: flex; gap: 8px; align-items: flex-start;
-  flex-direction: ${(p) => (p.$role === 'user' ? 'row-reverse' : 'row')};
-  max-width: 100%;
-`
 
 const Reasoning = styled.div<{ $open: boolean; $streaming: boolean }>`
-  max-width: calc(100% - 50px);
+  max-width: 100%;
   border-left: 2px solid ${(p) => (p.$streaming ? 'var(--accent)' : 'var(--border)')};
   padding-left: 10px;
   font-size: 12.5px; line-height: 1.55;
@@ -31,23 +24,16 @@ const Reasoning = styled.div<{ $open: boolean; $streaming: boolean }>`
   }
 `
 
-export function ReasoningBlock({ text, streaming, role }: { text: string; streaming: boolean; role: string }) {
+export function ReasoningBlock({ text, streaming }: { text: string; streaming: boolean }) {
   const [open, setOpen] = useState(false)
   if (!text) return null
   return (
-    <ReasoningWrap $role={role}>
-      {role === 'assistant' ? (
-        <Avatar $role={role}>{roleAvatars[role] ?? '?'}</Avatar>
-      ) : (
-        <span style={{ width: 30, flexShrink: 0 }} />
-      )}
-      <Reasoning $open={open} $streaming={streaming}>
-        <div className="head" onClick={() => setOpen((o) => !o)}>
-          <span className="caret">▶</span>
-          <span>💭 思考过程{streaming ? '…' : ''}</span>
-        </div>
-        <div className="body">{text}</div>
-      </Reasoning>
-    </ReasoningWrap>
+    <Reasoning $open={open} $streaming={streaming}>
+      <div className="head" onClick={() => setOpen((o) => !o)}>
+        <span className="caret">▶</span>
+        <span>💭 思考过程{streaming ? '…' : ''}</span>
+      </div>
+      <div className="body">{text}</div>
+    </Reasoning>
   )
 }

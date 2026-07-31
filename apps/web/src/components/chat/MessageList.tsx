@@ -1,51 +1,32 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
-import { Avatar, Messages, MessageGroup, Bubble, Thinking, ToolRow, toolNames, roleAvatars } from './styles'
+import { Avatar, Messages, Bubble, Thinking, ToolRow, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 
-function renderMessageParts(m: UIMessage) {
+function MessageParts({ message }: { message: UIMessage }): ReactNode {
   const nodes: ReactNode[] = []
   let textBuf = ''
-  let firstBubble = true
   let tbIndex = 0
   const flushText = () => {
     if (!textBuf) return
     const t = textBuf
     textBuf = ''
-    const key = `t-${tbIndex++}`
-    nodes.push(
-      <MessageGroup key={key} $role={m.role}>
-        {firstBubble ? (
-          <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
-        ) : (
-          <span style={{ width: 30, flexShrink: 0 }} />
-        )}
-        <Bubble $role={m.role}>{t}</Bubble>
-      </MessageGroup>,
-    )
-    firstBubble = false
+    nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
   }
-  m.parts.forEach((part, i) => {
+  message.parts.forEach((part, i) => {
     if (isTextUIPart(part) && part.text) {
       textBuf += part.text
     } else if (isReasoningUIPart(part) && part.text) {
       flushText()
       const streaming = part.state === 'streaming'
-      nodes.push(
-        <ReasoningBlock
-          key={`reason-${i}`}
-          text={part.text}
-          streaming={streaming}
-          role={m.role}
-        />,
-      )
+      nodes.push(<ReasoningBlock key={`reason-${i}`} text={part.text} streaming={streaming} />)
     } else if (isToolUIPart(part)) {
       flushText()
       const name = toolNames[getToolName(part)] || getToolName(part)
       const running = part.state !== 'output-available' && part.state !== 'output-error'
       nodes.push(
-        <ToolRow key={`tool-${i}`} style={m.role === 'user' ? { flexDirection: 'row-reverse' } : undefined}>
+        <ToolRow key={`tool-${i}`}>
           <div className={running ? 'chip running' : 'chip'}>
             <span className="icon">🔧</span>
             <span>{name}</span>
@@ -56,18 +37,20 @@ function renderMessageParts(m: UIMessage) {
   })
   flushText()
   if (nodes.length === 0) {
-    nodes.push(
-      <MessageGroup key="empty" $role={m.role}>
-        {firstBubble ? (
-          <Avatar $role={m.role}>{roleAvatars[m.role] ?? '?'}</Avatar>
-        ) : (
-          <span style={{ width: 30, flexShrink: 0 }} />
-        )}
-        <Bubble $role={m.role} />,
-      </MessageGroup>,
-    )
+    nodes.push(<Bubble key="empty" $role={message.role} />)
   }
-  return nodes
+  return <>{nodes}</>
+}
+
+function MessageItem({ message }: { message: UIMessage }) {
+  return (
+    <MessageRow $role={message.role}>
+      <Avatar $role={message.role}>{roleAvatars[message.role] ?? '?'}</Avatar>
+      <MessageContent $role={message.role}>
+        <MessageParts message={message} />
+      </MessageContent>
+    </MessageRow>
+  )
 }
 
 interface MessageListProps {
@@ -87,9 +70,7 @@ export function MessageList({ messages, streaming, status, error }: MessageListP
   return (
     <Messages>
       {messages.map((m) => (
-        <div key={m.id} style={{ display: 'contents' }}>
-          {renderMessageParts(m)}
-        </div>
+        <MessageItem key={m.id} message={m} />
       ))}
       {streaming && (
         <Thinking>

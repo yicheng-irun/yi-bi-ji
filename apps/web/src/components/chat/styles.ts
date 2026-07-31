@@ -14,18 +14,12 @@ export const Avatar = styled.div<{ $role: string }>`
   color: ${(p) => (p.$role === 'user' ? 'var(--accent)' : 'var(--text-secondary)')};
 `
 
-export const MessageGroup = styled.div<{ $role: string }>`
-  display: flex; gap: 8px; align-items: flex-start;
-  flex-direction: ${(p) => (p.$role === 'user' ? 'row-reverse' : 'row')};
-  max-width: 100%;
-`
-
 export const Bubble = styled.div<{ $role: string }>`
   background: ${(p) => (p.$role === 'user' ? 'var(--accent-light)' : '#f9fafb')};
   border-radius: ${(p) =>
     p.$role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px'};
   padding: 10px 14px; font-size: 14px; line-height: 1.55;
-  white-space: pre-wrap; word-break: break-word; max-width: calc(100% - 50px);
+  white-space: pre-wrap; word-break: break-word; max-width: 100%;
   color: var(--text);
 `
 
@@ -87,6 +81,19 @@ export const ContextBar = styled.div`
   display: flex; justify-content: flex-end; padding: 2px 14px;
   font-size: 11px; color: var(--text-muted); background: var(--bg-hover);
   border-top: 1px solid var(--border);
+`
+
+
+export const MessageRow = styled.div<{ $role: string }>`
+  display: flex; gap: 8px; align-items: flex-start;
+  flex-direction: ${(p) => (p.$role === 'user' ? 'row-reverse' : 'row')};
+  max-width: 100%;
+`
+
+export const MessageContent = styled.div<{ $role: string }>`
+  display: flex; flex-direction: column; gap: 12px;
+  flex: 1; min-width: 0;
+  align-items: ${(p) => (p.$role === 'user' ? 'flex-end' : 'flex-start')};
 `
 
 export const toolNames: Record<string, string> = {
