@@ -17,6 +17,7 @@
     "diff": "latest",
     "hono": "latest",
     "linkedom": "^0.18.13",
+    "mysql2": "^3.23.2",
     "playwright": "^1.62.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",

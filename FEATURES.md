@@ -71,6 +71,9 @@
 
 ## 设置
 
-- 设置页 `/settings`（顶部导航「设置」）：在线修改大模型配置（Base URL / API Key / 模型名），覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
+- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
+- 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
+- 大模型配置：在线修改 Base URL / API Key / 模型名，覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性
+- 数据库备份：配置 MySQL（Host/Port/User/Password/数据库名，存 `app_settings` 的 `backup*` 键），「测试连接」验证连通性（`POST /api/backup/test`）；「一键备份」（`POST /api/backup/sync`）在备份库自动建表（notes / chat_threads / chat_messages / ai_change_logs / app_settings）并清空后全量同步数据（事务内执行，返回各表行数）；数据库名需预先创建

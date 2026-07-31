@@ -6,6 +6,12 @@ export interface Settings {
   aiApiKey: string
   aiModel: string
   reasoningEffort: string
+  backupType: string
+  backupHost: string
+  backupPort: string
+  backupUser: string
+  backupPassword: string
+  backupDatabase: string
 }
 
 const cache: Record<string, string> = {}
@@ -21,6 +27,12 @@ export function getSettings(): Settings {
     aiApiKey: cache.aiApiKey ?? env.aiApiKey,
     aiModel: cache.aiModel ?? env.aiModel,
     reasoningEffort: cache.reasoningEffort ?? '',
+    backupType: cache.backupType ?? 'mysql',
+    backupHost: cache.backupHost ?? '',
+    backupPort: cache.backupPort ?? '3306',
+    backupUser: cache.backupUser ?? '',
+    backupPassword: cache.backupPassword ?? '',
+    backupDatabase: cache.backupDatabase ?? '',
   }
 }
 

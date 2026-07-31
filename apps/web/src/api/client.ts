@@ -151,6 +151,10 @@ export const api = {
     request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
   testSettings: () =>
     request<{ ok: boolean; text?: string; error?: string }>('/api/settings/test', { method: 'POST', body: '{}' }),
+  testBackup: () =>
+    request<{ ok: boolean; error?: string }>('/api/backup/test', { method: 'POST', body: '{}' }),
+  syncBackup: () =>
+    request<{ ok: boolean; counts?: Record<string, number>; error?: string }>('/api/backup/sync', { method: 'POST', body: '{}' }),
 }
 
 export interface Settings {
@@ -158,6 +162,12 @@ export interface Settings {
   aiApiKey: string
   aiModel: string
   reasoningEffort: string
+  backupType: string
+  backupHost: string
+  backupPort: string
+  backupUser: string
+  backupPassword: string
+  backupDatabase: string
 }
 
 export const REASONING_EFFORT_OPTIONS: { value: string; label: string }[] = [

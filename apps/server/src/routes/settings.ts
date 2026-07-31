@@ -1,24 +1,23 @@
 import { Hono } from 'hono'
 import { generateText } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { getSettings, updateSettings } from '../services/settings.js'
+import { getSettings, updateSettings, type Settings } from '../services/settings.js'
 
 export const settingsRoutes = new Hono()
 
 settingsRoutes.get('/', async (c) => c.json(getSettings()))
 
 settingsRoutes.put('/', async (c) => {
-  const body = await c.req.json<{
-    aiBaseURL?: string
-    aiApiKey?: string
-    aiModel?: string
-    reasoningEffort?: string
-  }>()
+  const body = await c.req.json<Partial<Settings>>()
   const clean: Record<string, string> = {}
-  if (typeof body.aiBaseURL === 'string' && body.aiBaseURL.trim()) clean.aiBaseURL = body.aiBaseURL.trim()
-  if (typeof body.aiApiKey === 'string') clean.aiApiKey = body.aiApiKey.trim()
-  if (typeof body.aiModel === 'string' && body.aiModel.trim()) clean.aiModel = body.aiModel.trim()
-  if (typeof body.reasoningEffort === 'string') clean.reasoningEffort = body.reasoningEffort.trim()
+  const keys: (keyof Settings)[] = [
+    'aiBaseURL', 'aiApiKey', 'aiModel', 'reasoningEffort',
+    'backupType', 'backupHost', 'backupPort', 'backupUser', 'backupPassword', 'backupDatabase',
+  ]
+  for (const key of keys) {
+    const v = body[key]
+    if (typeof v === 'string') clean[key] = v.trim()
+  }
   return c.json(await updateSettings(clean))
 })
 
