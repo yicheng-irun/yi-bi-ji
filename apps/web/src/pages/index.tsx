@@ -162,6 +162,8 @@ export default function NotesPage() {
               {n.draftTitle || '(无标题)'}
             </div>
             <div className="meta">
+              #{n.id}
+              {' · '}
               {new Date(n.updatedAt).toLocaleString('zh-CN')}
               {n.tags.length > 0 && (
                 <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>
