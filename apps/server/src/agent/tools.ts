@@ -117,7 +117,7 @@ export function createNoteTools(threadId: string) {
         tags: z.array(z.string()).describe('新的标签列表（整体替换，传空数组表示清空）'),
       }),
       execute: async ({ noteId, tags }) => {
-        const note = await updateNoteMeta(noteId, { tags })
+        const note = await updateNoteMeta(noteId, { tags }, { threadId })
         return { ok: true, tags: note.tags }
       },
     }),

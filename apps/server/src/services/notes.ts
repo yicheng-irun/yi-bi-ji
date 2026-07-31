@@ -44,11 +44,22 @@ function normalizeTags(tags: string[]) {
   return [...new Set(tags.map((t) => t.trim()).filter(Boolean))]
 }
 
-export async function updateNoteMeta(id: number, input: { tags?: string[] }) {
+export async function updateNoteMeta(id: number, input: { tags?: string[] }, ai?: { threadId: string }) {
   const note = await getNoteOrThrow(id)
+  const beforeTags = note.tags
   if (input.tags !== undefined) note.tags = JSON.stringify(normalizeTags(input.tags))
   await note.save()
-  emitNoteUpdated(note, 'user')
+  if (ai && input.tags !== undefined) {
+    await AiChangeLog.create({
+      noteId: id,
+      threadId: ai.threadId,
+      action: 'set_note_tags',
+      summary: `设置标签：${normalizeTags(input.tags).join('、') || '(清空)'}`,
+      beforeContent: beforeTags,
+      afterContent: note.tags,
+    })
+  }
+  emitNoteUpdated(note, ai ? 'ai' : 'user')
   return serializeNote(note)
 }
 
