@@ -1,7 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
-import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolRow, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
+import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCardBox, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
 
@@ -13,23 +13,84 @@ function isSubagentOutput(o: unknown): o is SubagentMessage {
   return !!o && typeof o === 'object' && Array.isArray((o as SubagentMessage).parts)
 }
 
+function isSubagentRunning(output: SubagentMessage): boolean {
+  return (
+    output.parts?.some(
+      (p) => isToolUIPart(p) && p.state !== 'output-available' && p.state !== 'output-error',
+    ) ?? false
+  )
+}
+
+type ToolPart = Parameters<typeof isToolUIPart>[0]
+
 function SubagentOutput({ output }: { output: SubagentMessage }) {
   const nodes: ReactNode[] = []
   output.parts?.forEach((part, i) => {
     if (isTextUIPart(part) && part.text) {
       nodes.push(<div key={`s-text-${i}`} className="sub-text">{part.text}</div>)
     } else if (isToolUIPart(part)) {
-      const name = toolNames[getToolName(part)] || getToolName(part)
-      const running = part.state !== 'output-available' && part.state !== 'output-error'
-      nodes.push(
-        <div key={`s-tool-${i}`} className={running ? 'sub-tool running' : 'sub-tool'}>
-          <span>🔧</span>
-          <span>{name}</span>
-        </div>,
-      )
+      nodes.push(<ToolCard key={`s-tool-${i}`} part={part} />)
     }
   })
   return <SubagentBlock>{nodes}</SubagentBlock>
+}
+
+function ToolCard({ part }: { part: ToolPart }) {
+  if (!isToolUIPart(part)) return null
+  const name = toolNames[getToolName(part)] || getToolName(part)
+  const subOut = isSubagentOutput(part.output)
+  const running = subOut ? isSubagentRunning(part.output as SubagentMessage) : part.state !== 'output-available' && part.state !== 'output-error'
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (subOut && running) setOpen(true)
+  }, [subOut, running])
+
+  const input = part.input
+  const output = part.output
+  const hasError = part.state === 'output-error'
+
+  return (
+    <ToolCardBox>
+      <div className={open ? 'head open' : 'head'} onClick={() => setOpen((o) => !o)}>
+        <span className="icon">🔧</span>
+        <span className="name">{name}</span>
+        {running && <span className="status">执行中…</span>}
+        {!running && hasError && <span className="status err">失败</span>}
+        <span className="caret">▸</span>
+      </div>
+      {open && (
+        <div className="body">
+          {input != null && (
+            <div className="sec">
+              <div className="label">参数</div>
+              <pre className="json">{JSON.stringify(input, null, 2)}</pre>
+            </div>
+          )}
+          {hasError && part.errorText && (
+            <div className="sec">
+              <div className="label">错误</div>
+              <pre className="error">{part.errorText}</pre>
+            </div>
+          )}
+          {part.state === 'output-available' && output !== undefined && (
+            <div className="sec">
+              <div className="label">{subOut ? '子代理过程' : '结果'}</div>
+              {subOut ? (
+                <SubagentOutput output={output as SubagentMessage} />
+              ) : typeof output === 'string' ? (
+                <pre className="text">{output}</pre>
+              ) : output == null ? (
+                <span className="muted">(无输出)</span>
+              ) : (
+                <pre className="json">{JSON.stringify(output, null, 2)}</pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </ToolCardBox>
+  )
 }
 
 function MessageParts({ message }: { message: UIMessage }): ReactNode {
@@ -59,19 +120,7 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
       nodes.push(<ReasoningBlock key={`reason-${i}`} text={part.text} streaming={streaming} />)
     } else if (isToolUIPart(part)) {
       flushText()
-      const name = toolNames[getToolName(part)] || getToolName(part)
-      const running = part.state !== 'output-available' && part.state !== 'output-error'
-      nodes.push(
-        <ToolRow key={`tool-${i}`}>
-          <div className={running ? 'chip running' : 'chip'}>
-            <span className="icon">🔧</span>
-            <span>{name}</span>
-          </div>
-          {part.state === 'output-available' && isSubagentOutput(part.output) && (
-            <SubagentOutput output={part.output} />
-          )}
-        </ToolRow>,
-      )
+      nodes.push(<ToolCard key={`tool-${i}`} part={part} />)
     }
   })
   flushText()
