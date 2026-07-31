@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { ChatPanel } from './ChatPanel'
 
-const DEFAULT_WIDTH = 400
+const DEFAULT_WIDTH = 600
 const MIN_WIDTH = 320
 const MAX_WIDTH = 800
 
@@ -132,41 +132,41 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
       </ResizeHandle>
       <Pane>
         <Header>
-        <select value={threadId} onChange={(e) => setThreadId(e.target.value)}>
-          <option value="">新对话</option>
-          {visible.map((t) => (
-            <option key={t.id} value={t.id}>{threadLabel(t)}</option>
-          ))}
-        </select>
-        {currentNoteId !== undefined && (
-          <FilterToggle>
-            <button className={scope === 'note' ? 'on' : ''} onClick={() => { setScope('note'); setThreadId('') }}>本笔记</button>
-            <button className={scope === 'all' ? 'on' : ''} onClick={() => { setScope('all'); setThreadId('') }}>全部</button>
-          </FilterToggle>
-        )}
-        <button onClick={() => setThreadId('')}>+</button>
-        {threadId && (
-          <button
-            title="删除当前会话"
-            style={{ color: 'var(--red)', fontSize: 16, padding: '0 10px' }}
-            onClick={async () => {
-              const t = threads.find((x) => x.id === threadId)
-              if (!confirm(`确定删除会话「${t?.title || '对话'}」？消息记录将一并删除。`)) return
-              await api.deleteThread(threadId)
-              setThreads((ts) => ts.filter((x) => x.id !== threadId))
-              setThreadId('')
-            }}
-          >🗑</button>
-        )}
-      </Header>
-      <ChatPanel
-        threadId={threadId}
-        currentNoteId={currentNoteId}
-        onThreadCreated={(t) => {
-          setThreads((ts) => [t, ...ts])
-          setThreadId(t.id)
-        }}
-      />
+          <select value={threadId} onChange={(e) => setThreadId(e.target.value)}>
+            <option value="">新对话</option>
+            {visible.map((t) => (
+              <option key={t.id} value={t.id}>{threadLabel(t)}</option>
+            ))}
+          </select>
+          {currentNoteId !== undefined && (
+            <FilterToggle>
+              <button className={scope === 'note' ? 'on' : ''} onClick={() => { setScope('note'); setThreadId('') }}>本笔记</button>
+              <button className={scope === 'all' ? 'on' : ''} onClick={() => { setScope('all'); setThreadId('') }}>全部</button>
+            </FilterToggle>
+          )}
+          <button onClick={() => setThreadId('')}>+</button>
+          {threadId && (
+            <button
+              title="删除当前会话"
+              style={{ color: 'var(--red)', fontSize: 16, padding: '0 10px' }}
+              onClick={async () => {
+                const t = threads.find((x) => x.id === threadId)
+                if (!confirm(`确定删除会话「${t?.title || '对话'}」？消息记录将一并删除。`)) return
+                await api.deleteThread(threadId)
+                setThreads((ts) => ts.filter((x) => x.id !== threadId))
+                setThreadId('')
+              }}
+            >🗑</button>
+          )}
+        </Header>
+        <ChatPanel
+          threadId={threadId}
+          currentNoteId={currentNoteId}
+          onThreadCreated={(t) => {
+            setThreads((ts) => [t, ...ts])
+            setThreadId(t.id)
+          }}
+        />
       </Pane>
     </Container>
   )
