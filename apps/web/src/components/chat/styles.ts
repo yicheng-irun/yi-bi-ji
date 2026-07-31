@@ -32,13 +32,28 @@ export const ToolRow = styled.div`
   display: flex; align-items: center; gap: 6px; padding: 4px 0;
   font-size: 12px; color: var(--text-secondary);
 
-  .chip {
-    display: flex; align-items: center; gap: 5px;
-    background: #f3f4f6; border: 1px solid var(--border);
-    border-radius: 6px; padding: 4px 10px;
-  }
+  .chip { display: flex; align-items: center; gap: 5px; background: #f3f4f6; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
   .chip .icon { font-size: 13px; }
   .chip.running .icon { animation: ${blink} 1.2s ease infinite; }
+`
+
+export const SubagentBlock = styled.div`
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;
+  .sub-tool {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-secondary);
+    background: #f3f4f6; border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; align-self: flex-start;
+  }
+  .sub-tool.running span:first-child { animation: ${blink} 1.2s ease infinite; }
+  .sub-text {
+    font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+    color: var(--text);
+  }
+  .sub-text:not(:empty) {
+    background: #f9fafb; border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; max-height: 240px; overflow-y: auto;
+  }
 `
 
 export const Thinking = styled.div`
@@ -100,6 +115,7 @@ export const toolNames: Record<string, string> = {
   list_notes: '列笔记', search_notes: '搜索', read_note: '读取',
   create_note: '新建', write_note: '全量写', replace_in_note: '替换',
   insert_block: '插入', set_note_tags: '打标签', web_search: '联网搜索', web_fetch: '打开网页',
+  deep_research: '深度调研',
 }
 
 export const roleAvatars: Record<string, string> = { user: '我', assistant: 'AI' }

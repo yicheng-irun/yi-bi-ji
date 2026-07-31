@@ -1,8 +1,35 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
-import { Avatar, Messages, Bubble, Thinking, ToolRow, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
+import { Avatar, Messages, Bubble, Thinking, ToolRow, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
+
+interface SubagentMessage {
+  parts?: UIMessage['parts']
+}
+
+function isSubagentOutput(o: unknown): o is SubagentMessage {
+  return !!o && typeof o === 'object' && Array.isArray((o as SubagentMessage).parts)
+}
+
+function SubagentOutput({ output }: { output: SubagentMessage }) {
+  const nodes: ReactNode[] = []
+  output.parts?.forEach((part, i) => {
+    if (isTextUIPart(part) && part.text) {
+      nodes.push(<div key={`s-text-${i}`} className="sub-text">{part.text}</div>)
+    } else if (isToolUIPart(part)) {
+      const name = toolNames[getToolName(part)] || getToolName(part)
+      const running = part.state !== 'output-available' && part.state !== 'output-error'
+      nodes.push(
+        <div key={`s-tool-${i}`} className={running ? 'sub-tool running' : 'sub-tool'}>
+          <span>🔧</span>
+          <span>{name}</span>
+        </div>,
+      )
+    }
+  })
+  return <SubagentBlock>{nodes}</SubagentBlock>
+}
 
 function MessageParts({ message }: { message: UIMessage }): ReactNode {
   const nodes: ReactNode[] = []
@@ -31,6 +58,9 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
             <span className="icon">🔧</span>
             <span>{name}</span>
           </div>
+          {part.state === 'output-available' && isSubagentOutput(part.output) && (
+            <SubagentOutput output={part.output} />
+          )}
         </ToolRow>,
       )
     }

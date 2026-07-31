@@ -40,7 +40,7 @@
 - 笔记管理：Markdown 编辑、多视图模式、两阶段删除（待确认删除）。
 - 草稿与提交：双版本管理、版本冲突检测、SSE 实时同步、单篇/全部提交、放弃变更。
 - 行级 Diff 与 Hunk 视图：类 GitHub PR 的 hunk 区块，支持按块接受/拒绝。
-- AI 助手：与当前笔记联动的右侧侧边栏，内置 `list_notes` / `search_notes` / `read_note` / `write_note` / `replace_in_note` / `insert_block` / `web_search` / `web_fetch` 等工具，流式输出并展示工具调用卡片。
+- AI 助手：与当前笔记联动的右侧侧边栏，内置 `list_notes` / `search_notes` / `read_note` / `write_note` / `replace_in_note` / `insert_block` / `web_search` / `web_fetch` / `deep_research`（联网调研子代理，实时展示子代理进度）等工具，流式输出并展示工具调用卡片。
 - 会话持久化：会话存 `chat_threads` / `chat_messages` 表（UIMessage JSON），支持多线程对话与审计。
 - 实时同步：事件总线 + SSE，列表、编辑器、变更列表多端实时响应。
 
