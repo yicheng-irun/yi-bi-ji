@@ -163,6 +163,7 @@ export interface Settings {
   aiModel: string
   reasoningEffort: string
   backupType: string
+  backupPath: string
   backupHost: string
   backupPort: string
   backupUser: string

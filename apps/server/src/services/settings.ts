@@ -7,6 +7,7 @@ export interface Settings {
   aiModel: string
   reasoningEffort: string
   backupType: string
+  backupPath: string
   backupHost: string
   backupPort: string
   backupUser: string
@@ -27,7 +28,8 @@ export function getSettings(): Settings {
     aiApiKey: cache.aiApiKey ?? env.aiApiKey,
     aiModel: cache.aiModel ?? env.aiModel,
     reasoningEffort: cache.reasoningEffort ?? '',
-    backupType: cache.backupType ?? 'mysql',
+    backupType: cache.backupType ?? 'sqlite',
+    backupPath: cache.backupPath ?? '',
     backupHost: cache.backupHost ?? '',
     backupPort: cache.backupPort ?? '3306',
     backupUser: cache.backupUser ?? '',

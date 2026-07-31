@@ -76,4 +76,7 @@
 - 大模型配置：在线修改 Base URL / API Key / 模型名，覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性
-- 数据库备份：配置 MySQL（Host/Port/User/Password/数据库名，存 `app_settings` 的 `backup*` 键），「测试连接」验证连通性（`POST /api/backup/test`）；「一键备份」（`POST /api/backup/sync`）在备份库自动建表（notes / chat_threads / chat_messages / ai_change_logs / app_settings）并清空后全量同步数据（事务内执行，返回各表行数）；数据库名需预先创建
+- 数据库备份（`POST /api/backup/test`、`POST /api/backup/sync`）：支持两种备份类型，类型与连接信息存 `app_settings` 的 `backup*` 键
+  - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
+  - MySQL（`backupType=mysql`）：填 Host/Port/User/Password/数据库名（需预先建库）
+  - 「一键备份」在备份库自动建表（notes / chat_threads / chat_messages / ai_change_logs / app_settings，通用 schema 由 Sequelize 按 dialect 生成 DDL）并清空后全量同步数据（事务内执行，返回各表行数）

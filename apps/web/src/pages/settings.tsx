@@ -79,6 +79,11 @@ const TABS = [
   { key: 'backup', label: '数据备份', icon: '💾' },
 ] as const
 
+const BACKUP_TYPE_OPTIONS = [
+  { value: 'sqlite', label: 'SQLite 文件' },
+  { value: 'mysql', label: 'MySQL' },
+]
+
 type TabKey = typeof TABS[number]['key']
 
 interface Status {
@@ -142,7 +147,7 @@ export default function SettingsPage() {
     setBusy('test-backup')
     try {
       const r = await api.testBackup()
-      setStatus(r.ok ? { ok: true, text: 'MySQL 连接成功' } : { ok: false, text: r.error || '连接失败' })
+      setStatus(r.ok ? { ok: true, text: '连接成功' } : { ok: false, text: r.error || '连接失败' })
     } catch (e) {
       setStatus({ ok: false, text: (e as Error).message || '连接失败' })
     } finally {
@@ -221,34 +226,49 @@ export default function SettingsPage() {
 
           {tab === 'backup' && (
             <Card>
-              <h3>数据库备份（MySQL）</h3>
+              <h3>数据库备份</h3>
               <div className="hint">
-                配置一个 MySQL 备份库，点击「一键备份」即可在备份库中自动建表并同步全部数据（笔记 / 会话 / AI 修改记录 / 设置）。
+                选择备份类型：SQLite 文件（指定路径即可，自动创建）或 MySQL（需预先建库）。「一键备份」在备份库中自动建表并同步全部数据（笔记 / 会话 / AI 修改记录 / 设置）。
               </div>
-              <FieldRow>
-                <Field>
-                  <label>Host</label>
-                  <input value={form.backupHost} placeholder="127.0.0.1" onChange={(e) => set('backupHost', e.target.value)} />
-                </Field>
-                <Field>
-                  <label>Port</label>
-                  <input value={form.backupPort} placeholder="3306" onChange={(e) => set('backupPort', e.target.value)} />
-                </Field>
-              </FieldRow>
-              <FieldRow>
-                <Field>
-                  <label>User</label>
-                  <input value={form.backupUser} placeholder="root" onChange={(e) => set('backupUser', e.target.value)} />
-                </Field>
-                <Field>
-                  <label>Password</label>
-                  <input type="password" value={form.backupPassword} onChange={(e) => set('backupPassword', e.target.value)} />
-                </Field>
-              </FieldRow>
               <Field>
-                <label>数据库名</label>
-                <input value={form.backupDatabase} placeholder="bi_ji_backup（需预先创建）" onChange={(e) => set('backupDatabase', e.target.value)} />
+                <label>备份类型</label>
+                <div className="select-row">
+                  <Select value={form.backupType} onChange={(v) => set('backupType', v)} options={BACKUP_TYPE_OPTIONS} />
+                </div>
               </Field>
+              {form.backupType === 'sqlite' ? (
+                <Field>
+                  <label>备份文件路径</label>
+                  <input value={form.backupPath} placeholder="data/backup.db" onChange={(e) => set('backupPath', e.target.value)} />
+                </Field>
+              ) : (
+                <>
+                  <FieldRow>
+                    <Field>
+                      <label>Host</label>
+                      <input value={form.backupHost} placeholder="127.0.0.1" onChange={(e) => set('backupHost', e.target.value)} />
+                    </Field>
+                    <Field>
+                      <label>Port</label>
+                      <input value={form.backupPort} placeholder="3306" onChange={(e) => set('backupPort', e.target.value)} />
+                    </Field>
+                  </FieldRow>
+                  <FieldRow>
+                    <Field>
+                      <label>User</label>
+                      <input value={form.backupUser} placeholder="root" onChange={(e) => set('backupUser', e.target.value)} />
+                    </Field>
+                    <Field>
+                      <label>Password</label>
+                      <input type="password" value={form.backupPassword} onChange={(e) => set('backupPassword', e.target.value)} />
+                    </Field>
+                  </FieldRow>
+                  <Field>
+                    <label>数据库名</label>
+                    <input value={form.backupDatabase} placeholder="bi_ji_backup（需预先创建）" onChange={(e) => set('backupDatabase', e.target.value)} />
+                  </Field>
+                </>
+              )}
               <Actions>
                 <button className="btn-primary" onClick={() => void save()} disabled={saving}>
                   {saving ? '保存中…' : '保存配置'}
