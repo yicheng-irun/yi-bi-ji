@@ -110,13 +110,13 @@ interface ChatPanelProps {
 function renderMessageParts(m: UIMessage): ReactNode[] {
   const nodes: ReactNode[] = []
   let textBuf = ''
-  let textStart = -1
   let firstBubble = true
+  let tbIndex = 0
   const flushText = () => {
     if (!textBuf) return
     const t = textBuf
     textBuf = ''
-    const key = `t-${textStart}`
+    const key = `t-${tbIndex++}`
     nodes.push(
       <MessageGroup key={key} $role={m.role}>
         {firstBubble ? (
@@ -131,7 +131,6 @@ function renderMessageParts(m: UIMessage): ReactNode[] {
   }
   m.parts.forEach((part, i) => {
     if (isTextUIPart(part) && part.text) {
-      if (textStart < 0) textStart = i
       textBuf += part.text
     } else if (isToolUIPart(part)) {
       flushText()
