@@ -45,7 +45,12 @@ export interface Thread {
   title: string
   createdAt: string
   updatedAt: string
-  metadata?: { originNoteId?: number }
+  metadata?: {
+    originNoteId?: number
+    kind?: 'subagent'
+    parentThreadId?: string
+    subagentId?: string
+  }
 }
 
 /** 当前前端实例的唯一 id，用于识别并忽略 SSE 中自己产生的回声事件 */

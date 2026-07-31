@@ -32,6 +32,6 @@ export function createNoteAgent(threadId: string) {
 5. 用户当前正在查看的笔记 id 可能会在对话中提供，优先基于它工作。
 6. 用中文回复，保持简洁。`,
     tools: createNoteTools(threadId),
-    stopWhen: isStepCount(30),
+    stopWhen: isStepCount(50),
   })
 }

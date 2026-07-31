@@ -104,9 +104,14 @@ export default function ConversationsPage() {
               >🗑</button>
             </div>
             <div className="t-sub">
-              {t.metadata?.originNoteId
-                ? <span className="t-origin">笔记 #{t.metadata.originNoteId}</span>
-                : <span className="t-origin" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>全局</span>}
+              {t.metadata?.kind === 'subagent'
+                ? <span className="t-origin" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>🔬 子代理</span>
+                : t.metadata?.originNoteId
+                  ? <span className="t-origin">笔记 #{t.metadata.originNoteId}</span>
+                  : <span className="t-origin" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>全局</span>}
+              {t.metadata?.parentThreadId && (
+                <span>← <Link to="/conversations" onClick={() => setActiveId(t.metadata!.parentThreadId!)}>父会话</Link></span>
+              )}
               <span>{new Date(t.updatedAt).toLocaleString('zh-CN')}</span>
             </div>
           </ThreadItem>

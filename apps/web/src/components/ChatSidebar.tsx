@@ -91,6 +91,12 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
     api.listThreads().then((res) => setThreads(res.threads)).catch(console.error)
   }, [])
 
+  // 子代理的会话（深度调研等）不进侧边栏会话下拉，只在会话库/审计页查看
+  const userThreads = useMemo(
+    () => threads.filter((t) => t.metadata?.kind !== 'subagent'),
+    [threads],
+  )
+
   // 打开笔记（或切换笔记/切换范围）时，自动选中最近的一条会话，而非新会话
   useEffect(() => {
     const key = `${scope}:${currentNoteId ?? 'none'}`
@@ -102,19 +108,19 @@ export function ChatSidebar({ currentNoteId }: { currentNoteId?: number }) {
     if (autoSelected.current.has(key)) return
     const latest =
       scope === 'note' && currentNoteId !== undefined
-        ? threads.find((t) => t.metadata?.originNoteId === currentNoteId)
-        : threads[0]
+        ? userThreads.find((t) => t.metadata?.originNoteId === currentNoteId)
+        : userThreads[0]
     if (latest) {
       setThreadId(latest.id)
       autoSelected.current.add(key)
     }
-  }, [threads, currentNoteId, scope])
+  }, [userThreads, currentNoteId, scope])
 
   const visible = useMemo(
     () => (scope === 'note' && currentNoteId
-      ? threads.filter((t) => t.metadata?.originNoteId === currentNoteId)
-      : threads),
-    [threads, scope, currentNoteId],
+      ? userThreads.filter((t) => t.metadata?.originNoteId === currentNoteId)
+      : userThreads),
+    [userThreads, scope, currentNoteId],
   )
 
   const threadLabel = (t: Thread) => {

@@ -45,7 +45,7 @@
   - `set_note_tags` — 设置笔记标签
   - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
   - `web_fetch` — 打开网页提取正文；动态页面就绪策略为 networkidle 短等 + DOM 稳定性（MutationObserver）+ 内容不足时滚动到底触发懒加载；HTML 页面默认返回 Markdown（保留链接/图片地址并转绝对 URL，可选 `format: 'text'` 纯文本），JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
-  - `deep_research` — 联网深度调研子代理（`ToolLoopAgent` 嵌套）：主代理把任务委托给独立的研究子代理（独立上下文，仅 web_search/web_fetch 工具，步骤上限 20），子代理进度通过 streaming tool results（preliminary）实时流给前端，前端在工具卡片内渲染子代理的每一步与累积文本；主代理模型侧通过 `toModelOutput` 只看到子代理最终的结构化报告（含来源链接），避免上下文膨胀
+  - `deep_research` — 联网深度调研子代理（`ToolLoopAgent` 嵌套）：主代理把任务委托给独立的研究子代理（独立上下文，web_search/web_fetch + 读写笔记工具，步骤上限 50），子代理进度通过 streaming tool results（preliminary）实时流给前端，前端在工具卡片内渲染子代理的每一步与累积文本；主代理模型侧通过 `toModelOutput` 只看到子代理最终的结构化报告（含来源链接），避免上下文膨胀
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表
 - 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片
 - 支持展示 AI 的推理/思考过程：reasoning 内容以可折叠的「💭 思考过程」卡片呈现（带字数统计），流式过程中高亮并标注「思考过程…」，默认展开，点击标题可折叠/展开
@@ -58,6 +58,7 @@
 - 会话与消息持久化在业务库（`data/notes.db`）的 `chat_threads` / `chat_messages` 表中，消息以 UIMessage JSON（parts）存储
 - 发给模型的上下文截取最近 40 条消息
 - 支持多线程对话管理、重新进入历史对话继续沟通
+- 子代理（深度调研）每次执行会创建独立的子会话（`chat_threads`，metadata `kind='subagent'` + `parentThreadId` 关联父会话），子代理的完整消息流（含其工具调用与最终报告）持久化到该子会话；可在 `/conversations` 审计页查看（带「🔬 子代理」徽标、可跳回父会话），侧边栏会话下拉自动排除子会话，删除父会话级联删除其子会话
 - 打开笔记时自动选中该笔记最近的一条会话（而非新会话），可手动切换或点「+」开始新对话；切换笔记/本笔记·全部范围时同样自动定位到对应最近会话
 - 便于审计 AI 行为和排查错误
 

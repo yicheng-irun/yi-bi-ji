@@ -1,8 +1,10 @@
-import { readUIMessageStream, toUIMessageStream, tool } from 'ai'
+import { readUIMessageStream, toUIMessageStream, tool, type UIMessage } from 'ai'
 import { z } from 'zod'
+import { ChatThread } from '../db/models.js'
 import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
+import { persistMessages } from '../services/chat.js'
 import { createWebTools } from './web-tools.js'
-import { researchSubagent } from './subagents.js'
+import { createResearchSubagent } from './subagents.js'
 
 export function createNoteTools(threadId: string) {
   return {
@@ -10,19 +12,47 @@ export function createNoteTools(threadId: string) {
 
     deep_research: tool({
       description:
-        '联网深度调研一个主题或问题：派出一个独立的联网研究子代理，它会在多个搜索词、多篇文章之间自主调研后返回一份带来源链接的结构化报告。适合需要翻阅大量网页、深度对比资料的场景；简单查一条信息用 web_search 即可。',
+        '联网深度调研一个主题或问题：派出一个独立的联网研究子代理，它会自主搜索、读文，必要时直接读写笔记，最终返回带来源链接的结构化报告。适合需要翻阅大量网页、深度对比资料的场景；简单查一条信息用 web_search 即可。',
       inputSchema: z.object({
         task: z.string().describe('要调研的问题或主题，尽量具体（含目标、需要回答的子问题、关注维度）'),
       }),
       execute: async function* ({ task }, { abortSignal }) {
-        const result = await researchSubagent.stream({
-          prompt: task,
-          abortSignal,
+        const subThreadId = crypto.randomUUID()
+        const title = `深度调研：${task.replace(/\s+/g, ' ').trim().slice(0, 30)}`
+        await ChatThread.create({
+          id: subThreadId,
+          title,
+          metadata: JSON.stringify({
+            parentThreadId: threadId,
+            kind: 'subagent',
+            subagentId: 'research-subagent',
+          }),
         })
-        for await (const message of readUIMessageStream({
-          stream: toUIMessageStream({ stream: result.stream, tools: researchSubagent.tools }),
-        })) {
-          yield message
+
+        const { deep_research: _exclude, ...subagentTools } = createNoteTools(subThreadId)
+        const subagent = createResearchSubagent(subagentTools)
+        const result = await subagent.stream({ prompt: task, abortSignal })
+
+        const userMessage: UIMessage = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          parts: [{ type: 'text', text: task }],
+        }
+        const collected = new Map<string, UIMessage>([[userMessage.id, userMessage]])
+
+        try {
+          for await (const message of readUIMessageStream({
+            stream: toUIMessageStream({ stream: result.stream, tools: subagent.tools }),
+          })) {
+            collected.set(message.id, message)
+            yield message
+          }
+        } finally {
+          if (!abortSignal?.aborted) {
+            await persistMessages(subThreadId, [...collected.values()]).catch((err) =>
+              console.error('persist subagent messages failed', err),
+            )
+          }
         }
       },
       toModelOutput: ({ output }) => {

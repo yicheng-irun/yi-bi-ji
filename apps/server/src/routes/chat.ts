@@ -2,50 +2,11 @@ import { Hono } from 'hono'
 import { createAgentUIStreamResponse, type InferAgentUIMessage, type UIMessage } from 'ai'
 import { ChatMessage, ChatThread } from '../db/models.js'
 import { createNoteAgent } from '../agent/index.js'
+import { deleteThreadCascade, loadHistory, persistMessages, threadToJson } from '../services/chat.js'
 
 const MAX_CONTEXT_MESSAGES = 40
 
 export const chatRoutes = new Hono()
-
-function threadToJson(t: ChatThread) {
-  let metadata: Record<string, unknown> = {}
-  try {
-    metadata = JSON.parse(t.metadata || '{}')
-  } catch {
-    metadata = {}
-  }
-  return { id: t.id, title: t.title, createdAt: t.createdAt, updatedAt: t.updatedAt, metadata }
-}
-
-function rowToUIMessage(m: ChatMessage): UIMessage {
-  let parts: UIMessage['parts'] = []
-  try {
-    parts = JSON.parse(m.parts || '[]')
-  } catch {
-    parts = []
-  }
-  return { id: m.id, role: m.role as UIMessage['role'], parts }
-}
-
-async function loadHistory(threadId: string): Promise<UIMessage[]> {
-  const rows = await ChatMessage.findAll({ where: { threadId }, order: [['createdAt', 'ASC']] })
-  return rows.map(rowToUIMessage)
-}
-
-async function persistMessages(threadId: string, messages: UIMessage[]) {
-  const base = Date.now()
-  await ChatMessage.bulkCreate(
-    messages.map((m, i) => ({
-      id: m.id,
-      threadId,
-      role: m.role,
-      parts: JSON.stringify(m.parts ?? []),
-      createdAt: new Date(base + i),
-      updatedAt: new Date(base + i),
-    })),
-  )
-  await ChatThread.update({ updatedAt: new Date() }, { where: { id: threadId } })
-}
 
 chatRoutes.get('/threads', async (c) => {
   const threads = await ChatThread.findAll({ order: [['updatedAt', 'DESC']], limit: 100 })
@@ -75,9 +36,7 @@ chatRoutes.get('/threads/:id/context', async (c) => {
 })
 
 chatRoutes.delete('/threads/:id', async (c) => {
-  const threadId = c.req.param('id')
-  await ChatMessage.destroy({ where: { threadId } })
-  await ChatThread.destroy({ where: { id: threadId } })
+  await deleteThreadCascade(c.req.param('id'))
   return c.json({ ok: true })
 })
 
