@@ -18,7 +18,7 @@ export function createNoteTools(threadId: string) {
       description: '按关键词在笔记标题和正文中搜索（LIKE 模糊匹配），返回匹配的笔记与片段。',
       inputSchema: z.object({
         query: z.string().describe('搜索关键词'),
-        page: z.number().optional().describe('页码，从 1 开始'),
+        page: z.coerce.number().optional().describe('页码，从 1 开始'),
       }),
       execute: async ({ query, page }) => searchNotes(query, page ?? 1),
     }),
@@ -26,9 +26,9 @@ export function createNoteTools(threadId: string) {
     read_note: tool({
       description: '读取一篇笔记的草稿内容，可用 startLine/endLine 只读取指定行范围（从 1 开始，含端点）。返回总行数。',
       inputSchema: z.object({
-        noteId: z.number().describe('笔记 id'),
-        startLine: z.number().optional().describe('起始行（含），默认 1'),
-        endLine: z.number().optional().describe('结束行（含），默认到末尾'),
+        noteId: z.coerce.number().describe('笔记 id'),
+        startLine: z.coerce.number().optional().describe('起始行（含），默认 1'),
+        endLine: z.coerce.number().optional().describe('结束行（含），默认到末尾'),
       }),
       execute: async ({ noteId, startLine, endLine }) => readNote(noteId, startLine, endLine),
     }),
@@ -49,7 +49,7 @@ export function createNoteTools(threadId: string) {
     set_note_tags: tool({
       description: '设置一篇笔记的标签（整体替换）。标签是自由关键词，用于整理、归类笔记；先用 list_notes 看看已有标签名，尽量复用保持一致。',
       inputSchema: z.object({
-        noteId: z.number().describe('笔记 id'),
+        noteId: z.coerce.number().describe('笔记 id'),
         tags: z.array(z.string()).describe('新的标签列表（整体替换，传空数组表示清空）'),
       }),
       execute: async ({ noteId, tags }) => {
@@ -61,7 +61,7 @@ export function createNoteTools(threadId: string) {
     write_note: tool({
       description: '全量覆盖一篇笔记的草稿内容（短期由 AI 直接覆盖并更新版本号）。原草稿会记录到变更日志。',
       inputSchema: z.object({
-        noteId: z.number().describe('笔记 id'),
+        noteId: z.coerce.number().describe('笔记 id'),
         content: z.string().describe('新的完整 markdown 正文'),
       }),
       execute: async ({ noteId, content }) => {
@@ -74,7 +74,7 @@ export function createNoteTools(threadId: string) {
       description:
         '在笔记草稿中做字符串替换：把 old_string 替换为 new_string。old_string 必须在草稿中唯一出现，否则报错；失败时请先用 read_note 重新读取内容再重试。',
       inputSchema: z.object({
-        noteId: z.number().describe('笔记 id'),
+        noteId: z.coerce.number().describe('笔记 id'),
         old_string: z.string().describe('要被替换的原文（需在文中唯一）'),
         new_string: z.string().describe('替换后的文本'),
       }),
@@ -89,7 +89,7 @@ export function createNoteTools(threadId: string) {
       description:
         '在笔记草稿中锚点插入一个 markdown 区块。anchor 三选一：end（文末追加）、after_heading（在包含指定文字的标题行后追加）、after_text（在指定文本后追加）。',
       inputSchema: z.object({
-        noteId: z.number().describe('笔记 id'),
+        noteId: z.coerce.number().describe('笔记 id'),
         block: z.string().describe('要插入的 markdown 区块'),
         anchor: z
           .union([
@@ -109,7 +109,7 @@ export function createNoteTools(threadId: string) {
     delete_note: tool({
       description: '删除一篇笔记。已有被标记删除的笔记时不可重复删除。',
       inputSchema: z.object({
-        noteId: z.number().describe('要删除的笔记 id'),
+        noteId: z.coerce.number().describe('要删除的笔记 id'),
       }),
       execute: async ({ noteId }) => {
         const result = await aiDeleteNote(noteId, threadId)
@@ -121,7 +121,7 @@ export function createNoteTools(threadId: string) {
       description: '在互联网上搜索资料、新闻。返回标题、链接、摘要。找到相关结果后用 web_fetch 打开链接读取全文。',
       inputSchema: z.object({
         query: z.string().describe('搜索关键词，用中文或英文均可'),
-        maxResults: z.number().optional().describe('最多返回几条结果，默认 8'),
+        maxResults: z.coerce.number().optional().describe('最多返回几条结果，默认 8'),
       }),
       execute: async ({ query, maxResults }) => searchWeb(query, maxResults ?? 8),
     }),
@@ -135,8 +135,8 @@ export function createNoteTools(threadId: string) {
           .enum(['markdown', 'text'])
           .optional()
           .describe('输出格式：markdown 保留链接/图片（默认），text 纯文本'),
-        start: z.number().optional().describe('从第几个字符开始读（用于长文翻页），默认 0'),
-        maxChars: z.number().optional().describe('本次最多读取多少字符，默认 8000'),
+        start: z.coerce.number().optional().describe('从第几个字符开始读（用于长文翻页），默认 0'),
+        maxChars: z.coerce.number().optional().describe('本次最多读取多少字符，默认 8000'),
       }),
       execute: async ({ url, format, start, maxChars }) =>
         fetchWebPage(url, start ?? 0, maxChars ?? 8000, format ?? 'markdown'),
