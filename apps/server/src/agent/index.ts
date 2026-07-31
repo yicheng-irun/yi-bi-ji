@@ -1,18 +1,22 @@
 import { ToolLoopAgent, isStepCount } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { env } from '../env.js'
+import { getSettings } from '../services/settings.js'
 import { createNoteTools } from './tools.js'
 
-const provider = createOpenAICompatible({
-  name: 'custom',
-  baseURL: env.aiBaseURL,
-  apiKey: env.aiApiKey,
-})
-
 export function createNoteAgent(threadId: string) {
+  const s = getSettings()
+  const provider = createOpenAICompatible({
+    name: 'custom',
+    baseURL: s.aiBaseURL,
+    apiKey: s.aiApiKey,
+  })
+  const providerOptions = s.reasoningEffort
+    ? { custom: { reasoningEffort: s.reasoningEffort } }
+    : undefined
   return new ToolLoopAgent({
     id: 'note-agent',
-    model: provider(env.aiModel),
+    model: provider(s.aiModel),
+    providerOptions,
     instructions: `你是一个笔记系统的 AI 助手。用户通过网页编辑器管理 markdown 笔记，你可以在侧边栏与用户对话。
 
 你可以使用的工具：

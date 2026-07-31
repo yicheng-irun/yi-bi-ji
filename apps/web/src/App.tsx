@@ -14,6 +14,7 @@ export default function App() {
           <NavLink to="/changes">变更</NavLink>
           <NavLink to="/conversations">会话</NavLink>
           <NavLink to="/ai-logs">AI 记录</NavLink>
+          <NavLink to="/settings">设置</NavLink>
         </nav>
         <div id="topbar-slot" className="slot" />
       </TopBar>

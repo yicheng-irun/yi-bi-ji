@@ -93,6 +93,26 @@ ChatThread.init(
   },
 )
 
+export class AppSetting extends Model<InferAttributes<AppSetting>, InferCreationAttributes<AppSetting>> {
+  declare key: string
+  declare value: CreationOptional<string>
+  declare createdAt: CreationOptional<Date>
+  declare updatedAt: CreationOptional<Date>
+}
+
+AppSetting.init(
+  {
+    key: { type: DataTypes.STRING, primaryKey: true },
+    value: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
+    createdAt: { type: DataTypes.DATE },
+    updatedAt: { type: DataTypes.DATE },
+  },
+  {
+    sequelize,
+    tableName: 'app_settings',
+  },
+)
+
 export class ChatMessage extends Model<InferAttributes<ChatMessage>, InferCreationAttributes<ChatMessage>> {
   declare id: string
   declare threadId: string

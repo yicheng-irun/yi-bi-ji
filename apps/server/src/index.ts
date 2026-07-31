@@ -8,9 +8,12 @@ import { changesRoutes } from './routes/changes.js'
 import { chatRoutes } from './routes/chat.js'
 import { eventsRoutes } from './routes/events.js'
 import { aiLogsRoutes } from './routes/ai-logs.js'
+import { settingsRoutes } from './routes/settings.js'
 import { closeBrowser } from './services/browser.js'
+import { initSettingsCache } from './services/settings.js'
 
 await initDb()
+await initSettingsCache()
 
 const app = new Hono()
 
@@ -23,6 +26,7 @@ app.route('/api/changes', changesRoutes)
 app.route('/api/chat', chatRoutes)
 app.route('/api/events', eventsRoutes)
 app.route('/api/ai-logs', aiLogsRoutes)
+app.route('/api/settings', settingsRoutes)
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`)

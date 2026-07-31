@@ -68,3 +68,9 @@
 - 服务端 EventEmitter 事件总线 + `/api/events` SSE 端点
 - 事件类型：`note-updated` / `note-created` / `note-committed` / `note-deleted`
 - 前端笔记列表、编辑器、变更列表均通过 EventSource 实时响应变更
+
+## 设置
+
+- 设置页 `/settings`（顶部导航「设置」）：在线修改大模型配置（Base URL / API Key / 模型名），覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
+- 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
+- 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性

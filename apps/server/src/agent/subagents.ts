@@ -1,17 +1,21 @@
 import { ToolLoopAgent, isStepCount, type ToolSet } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { env } from '../env.js'
-
-const provider = createOpenAICompatible({
-  name: 'custom',
-  baseURL: env.aiBaseURL,
-  apiKey: env.aiApiKey,
-})
+import { getSettings } from '../services/settings.js'
 
 export function createResearchSubagent(tools: ToolSet) {
+  const s = getSettings()
+  const provider = createOpenAICompatible({
+    name: 'custom',
+    baseURL: s.aiBaseURL,
+    apiKey: s.aiApiKey,
+  })
+  const providerOptions = s.reasoningEffort
+    ? { custom: { reasoningEffort: s.reasoningEffort } }
+    : undefined
   return new ToolLoopAgent({
     id: 'research-subagent',
-    model: provider(env.aiModel),
+    model: provider(s.aiModel),
+    providerOptions,
     instructions: `你是一个独立的联网研究代理，负责在互联网上深入调研某个主题或问题，也可以按需读取和整理笔记。
 
 流程：

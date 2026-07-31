@@ -146,4 +146,23 @@ export const api = {
     request<{ ok: boolean }>(`/api/ai-logs/${id}`, { method: 'DELETE' }),
   clearAiChangeLogs: (params: { noteId?: number; action?: string } = {}) =>
     request<{ deleted: number }>('/api/ai-logs', { method: 'DELETE', body: JSON.stringify(params) }),
+  getSettings: () => request<Settings>('/api/settings'),
+  updateSettings: (data: Partial<Settings>) =>
+    request<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  testSettings: () =>
+    request<{ ok: boolean; text?: string; error?: string }>('/api/settings/test', { method: 'POST', body: '{}' }),
 }
+
+export interface Settings {
+  aiBaseURL: string
+  aiApiKey: string
+  aiModel: string
+  reasoningEffort: string
+}
+
+export const REASONING_EFFORT_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: '不设置' },
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+]
