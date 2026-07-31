@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, getToolName, isTextUIPart, isToolUIPart, type UIMessage } from 'ai'
+import { DefaultChatTransport, getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart, type UIMessage } from 'ai'
 import { api, type Thread } from '../api/client'
 
 const Messages = styled.div`
@@ -59,6 +59,56 @@ const Thinking = styled.div`
   .dots span:nth-child(2) { animation-delay: .2s; }
   .dots span:nth-child(3) { animation-delay: .4s; }
 `
+
+const ReasoningWrap = styled.div<{ $role: string }>`
+  display: flex; gap: 8px; align-items: flex-start;
+  flex-direction: ${(p) => (p.$role === 'user' ? 'row-reverse' : 'row')};
+  max-width: 100%;
+`
+
+const Reasoning = styled.div<{ $open: boolean; $streaming: boolean }>`
+  max-width: calc(100% - 50px);
+  border-left: 2px solid ${(p) => (p.$streaming ? 'var(--accent)' : 'var(--border)')};
+  padding-left: 10px;
+  font-size: 12.5px; line-height: 1.55;
+
+  .head {
+    display: inline-flex; align-items: center; gap: 5px;
+    cursor: pointer; user-select: none; padding: 1px 0;
+    color: ${(p) => (p.$streaming ? 'var(--accent)' : 'var(--text-muted)')};
+  }
+  .head .caret { font-size: 9px; transition: transform .15s;
+    ${(p) => (p.$open ? 'transform: rotate(90deg);' : 'transform: rotate(0);')} }
+  .body {
+    margin-top: 2px;
+    max-height: ${(p) => (p.$open ? '360px' : '0')};
+    overflow: hidden;
+    overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+    color: var(--text-muted);
+  }
+`
+
+function ReasoningBlock({ text, streaming, role }: { text: string; streaming: boolean; role: string }) {
+  const [open, setOpen] = useState(false)
+  if (!text) return null
+  return (
+    <ReasoningWrap $role={role}>
+      {role === 'assistant' ? (
+        <Avatar $role={role}>{roleAvatars[role] ?? '?'}</Avatar>
+      ) : (
+        <span style={{ width: 30, flexShrink: 0 }} />
+      )}
+      <Reasoning $open={open} $streaming={streaming}>
+        <div className="head" onClick={() => setOpen((o) => !o)}>
+          <span className="caret">▶</span>
+          <span>💭 思考过程{streaming ? '…' : ''}</span>
+        </div>
+        <div className="body">{text}</div>
+      </Reasoning>
+    </ReasoningWrap>
+  )
+}
 
 const MAX_TEXTAREA_HEIGHT = 132
 
@@ -132,6 +182,17 @@ function renderMessageParts(m: UIMessage): ReactNode[] {
   m.parts.forEach((part, i) => {
     if (isTextUIPart(part) && part.text) {
       textBuf += part.text
+    } else if (isReasoningUIPart(part) && part.text) {
+      flushText()
+      const streaming = part.state === 'streaming'
+      nodes.push(
+        <ReasoningBlock
+          key={`reason-${i}`}
+          text={part.text}
+          streaming={streaming}
+          role={m.role}
+        />,
+      )
     } else if (isToolUIPart(part)) {
       flushText()
       const name = toolNames[getToolName(part)] || getToolName(part)
