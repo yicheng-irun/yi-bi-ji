@@ -23,6 +23,14 @@ export const Bubble = styled.div<{ $role: string }>`
   color: var(--text);
 `
 
+export const MarkdownBubble = styled.div<{ $role: string }>`
+  background: ${(p) => (p.$role === 'user' ? 'var(--accent-light)' : '#f9fafb')};
+  border-radius: ${(p) =>
+    p.$role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px'};
+  padding: 10px 14px; max-width: 100%;
+  min-width: 0; overflow: hidden;
+`
+
 const blink = keyframes`
   0%,100% { opacity: 1; }
   50% { opacity: .3; }

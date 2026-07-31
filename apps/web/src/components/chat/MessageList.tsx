@@ -1,8 +1,9 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
-import { Avatar, Messages, Bubble, Thinking, ToolRow, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
+import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolRow, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
+import { ChatMarkdown } from './ChatMarkdown'
 
 interface SubagentMessage {
   parts?: UIMessage['parts']
@@ -39,7 +40,15 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
     if (!textBuf) return
     const t = textBuf
     textBuf = ''
-    nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
+    if (message.role === 'assistant') {
+      nodes.push(
+        <MarkdownBubble key={`t-${tbIndex++}`} $role={message.role}>
+          <ChatMarkdown content={t} />
+        </MarkdownBubble>,
+      )
+    } else {
+      nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
+    }
   }
   message.parts.forEach((part, i) => {
     if (isTextUIPart(part) && part.text) {
