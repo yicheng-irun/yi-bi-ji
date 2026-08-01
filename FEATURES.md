@@ -62,6 +62,7 @@
 - `Badge`：变体 `neutral/accent/success/warning/danger` + 形状 `pill/sm`，统一列表页/变更页/AI 记录页的徽标样式
 - `Empty`：`icon + title + compact`（紧凑用于 diff 内空状态），统一各页空状态
 - `Select` / `TagInput` / `Loading`：通用原语，已从 `components/` 迁入
+- `Modal`：通用弹窗（`createPortal` 渲染到 body、点击遮罩/Esc 关闭、滚动锁），`title/children/footer`，设置页 MCP 服务器编辑用
 
 ## 会话持久化
 
@@ -85,12 +86,13 @@
 
 ## 设置
 
-- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「Agent 能力」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
-- 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型/Agent、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
+- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「Agent 能力」「MCP 服务器」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
+- 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型/Agent、`mcp*` MCP 服务器、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
 - 大模型配置：在线修改 Base URL / API Key / 模型名，覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
 - Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效
-- 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性
+- MCP 服务器设置（`mcpServers`，JSON 数组）：通过 MCP 协议把外部服务器的工具挂载给主代理与调研子代理，用于扩展 Agent 能力；设置页以「列表 + 弹窗编辑」方式配置（不再手写 JSON），每行可开关启用（`enabled` 字段，未启用不挂载工具），下方「工具预览」连接各服务器列出其提供的工具；每项含 `name`（唯一标识，也是工具名前缀）、`type`（http/sse/stdio）、`url`（http/sse 用）、`headers`（http/sse 可选）、`command/args/env`（stdio 用）；加载的工具以 `mcp__{服务器名}__{工具名}` 命名避免与内置工具冲突，配置不变时结果按配置签名缓存复用（不重连），连接失败的服务器跳过并记录错误
+- 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性；`POST /api/mcp/test` 试连所有配置的 MCP 服务器并列出其可用工具
 - 数据库备份（`POST /api/backup/test`、`POST /api/backup/sync`）：支持两种备份类型，类型与连接信息存 `app_settings` 的 `backup*` 键
   - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
   - MySQL（`backupType=mysql`）：填 Host/Port/User/Password/数据库名（需预先建库）
