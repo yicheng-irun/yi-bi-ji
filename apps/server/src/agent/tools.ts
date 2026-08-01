@@ -27,6 +27,18 @@ function pickTools<T extends Record<string, unknown>>(all: T, enabled: Set<strin
   return Object.fromEntries(Object.entries(all).filter(([name]) => enabled.has(name))) as T
 }
 
+/** 工具返回值必须为纯 JSON（AI SDK 会做 Zod 校验），把 Date 转成 ISO 字符串，避免校验失败 */
+function toJsonSafe(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map(toJsonSafe)
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = toJsonSafe(v)
+    return out
+  }
+  return value
+}
+
 export function createNoteTools(
   threadId: string,
   enabledTools: Set<string> | null = null,
@@ -100,7 +112,7 @@ export function createNoteTools(
       inputSchema: z.object({}),
       execute: async () => {
         const notes = await listNotes()
-        return notes.map((n) => ({ id: n.id, title: n.draftTitle, updatedAt: n.updatedAt }))
+        return toJsonSafe(notes.map((n) => ({ id: n.id, title: n.draftTitle, updatedAt: n.updatedAt })))
       },
     }),
 
@@ -110,7 +122,7 @@ export function createNoteTools(
         query: z.string().describe('搜索关键词'),
         page: z.coerce.number().optional().describe('页码，从 1 开始'),
       }),
-      execute: async ({ query, page }) => searchNotes(query, page ?? 1),
+      execute: async ({ query, page }) => toJsonSafe(searchNotes(query, page ?? 1)),
     }),
 
     read_note: tool({
@@ -120,7 +132,7 @@ export function createNoteTools(
         startLine: z.coerce.number().optional().describe('起始行（含），默认 1'),
         endLine: z.coerce.number().optional().describe('结束行（含），默认到末尾'),
       }),
-      execute: async ({ noteId, startLine, endLine }) => readNote(noteId, startLine, endLine),
+      execute: async ({ noteId, startLine, endLine }) => toJsonSafe(readNote(noteId, startLine, endLine)),
     }),
 
     create_note: tool({
