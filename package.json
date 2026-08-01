@@ -2,7 +2,8 @@
   "name": "bi-ji",
   "private": true,
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
+    "dev": "pnpm --filter @bi-ji/server --filter @bi-ji/web --parallel run dev",
+    "start:opencode-mcp": "pnpm --filter @bi-ji/opencode-mcp start",
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm --filter @bi-ji/server test"
