@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { loadMcpTools, parseMcpServers } from '../agent/mcp.js'
+import { closeMcpClients, loadMcpTools, parseMcpServers } from '../agent/mcp.js'
 
 export const mcpRoutes = new Hono()
 
@@ -10,7 +10,8 @@ mcpRoutes.post('/test', async (c) => {
   if (servers.length === 0) {
     return c.json({ ok: true, servers: [] })
   }
-  const { serversInfo } = await loadMcpTools(servers)
+  const { serversInfo, clients } = await loadMcpTools(servers)
+  await closeMcpClients(clients)
   const failed = serversInfo.some((s) => s.error)
   return c.json({
     ok: !failed,

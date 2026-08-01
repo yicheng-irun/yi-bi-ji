@@ -72,11 +72,16 @@ export interface McpServerInfo {
 export interface LoadedMcp {
   tools: ToolSet
   serversInfo: McpServerInfo[]
+  /** 保持连接的 MCP 客户端（tools 的 execute 依赖它们，生命周期与缓存一致） */
+  clients: MCPClient[]
 }
 
 /**
  * 连接配置的 MCP 服务器并汇总它们的工具（键名带 mcp__服务器__工具 前缀，避免与内置工具冲突）。
  * 连接失败的服务器会记录 error 并继续处理其余服务器。
+ *
+ * 注意：返回的 tools 的 execute 依赖对应的 client 实例，因此 client 不在此处关闭，
+ * 由调用方在不再需要时通过 closeMcpClients() 统一关闭。
  */
 export async function loadMcpTools(servers: McpServerConfig[]): Promise<LoadedMcp> {
   const tools: ToolSet = {}
@@ -98,10 +103,14 @@ export async function loadMcpTools(servers: McpServerConfig[]): Promise<LoadedMc
       serversInfo.push({ name: server.name, tools: [], error: (e as Error).message })
     }
   }
+  return { tools, serversInfo, clients }
+}
+
+/** 关闭一批 MCP 客户端（缓存失效/服务重启时调用，避免连接泄漏） */
+export async function closeMcpClients(clients: MCPClient[]): Promise<void> {
   for (const c of clients) {
     await c.close().catch(() => {})
   }
-  return { tools, serversInfo }
 }
 
 let cache: { signature: string; loaded: LoadedMcp } | null = null
@@ -119,5 +128,9 @@ export async function loadMcpToolsCached(servers: McpServerConfig[]): Promise<Lo
 }
 
 export function clearMcpCache() {
+  const old = cache
   cache = null
+  if (old) {
+    void closeMcpClients(old.loaded.clients)
+  }
 }

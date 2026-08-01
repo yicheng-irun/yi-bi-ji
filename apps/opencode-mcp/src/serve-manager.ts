@@ -104,7 +104,7 @@ export class ServeManager {
     throw new Error(`opencode serve 在 ${timeoutMs}ms 内未就绪: ${url}`)
   }
 
-  /** 进程退出时清理：kill 子进程、清定时器 */
+  /** 进程退出时清理：kill 子进程、清定时器。子进程不退出时最多等 3s 后强杀 */
   async dispose(): Promise<void> {
     this.shutdown = true
     if (this.healthTimer) {
@@ -112,12 +112,26 @@ export class ServeManager {
       this.healthTimer = null
     }
     if (this.child?.pid) {
+      const pid = this.child.pid
       try {
-        process.kill(this.child.pid, 'SIGTERM')
+        process.kill(pid, 'SIGTERM')
       } catch {
         this.child?.kill('SIGTERM')
       }
-      await new Promise((r) => this.child?.once('exit', r))
+      const exited = await Promise.race([
+        new Promise<boolean>((r) => {
+          this.child?.once('exit', () => r(true))
+          this.child?.once('error', () => r(false))
+        }),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 3000)),
+      ])
+      if (!exited) {
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          this.child?.kill('SIGKILL')
+        }
+      }
       this.child = null
     }
   }

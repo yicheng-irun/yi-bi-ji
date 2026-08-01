@@ -43,7 +43,7 @@ serve({ fetch: app.fetch, port: env.mcpPort, hostname: env.mcpHostname }, (info)
 })
 
 async function shutdown() {
-  await transport.close().catch(() => {})
+  await Promise.race([transport.close(), new Promise((r) => setTimeout(r, 1000))]).catch(() => {})
   await serveManager.dispose()
   process.exit(0)
 }
