@@ -4,6 +4,7 @@ import { runDiffTests } from './diff.test.mts'
 import { runEventsTests } from './events.test.mts'
 import { runMcpTests } from './mcp.test.mts'
 import { runChatTests } from './chat.test.mts'
+import { runBrowserTests } from './browser.test.mts'
 
 async function main() {
   try {
@@ -12,6 +13,7 @@ async function main() {
     await runDiffTests()
     await runEventsTests()
     await runMcpTests()
+    await runBrowserTests()
     await runChatTests()
   } finally {
     stopServer()

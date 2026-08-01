@@ -46,6 +46,13 @@
   - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
   - `web_fetch` — 打开网页提取正文；动态页面就绪策略为 networkidle 短等 + DOM 稳定性（MutationObserver）+ 内容不足时滚动到底触发懒加载；HTML 页面默认返回 Markdown（保留链接/图片地址并转绝对 URL，可选 `format: 'text'` 纯文本），JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
   - `deep_research` — 联网深度调研子代理（`ToolLoopAgent` 嵌套）：主代理把任务委托给独立的研究子代理（独立上下文，web_search/web_fetch + 读写笔记工具，步骤上限 50），子代理进度通过 streaming tool results（preliminary）实时流给前端，前端在工具卡片内渲染子代理的每一步与累积文本；主代理模型侧通过 `toModelOutput` 只看到子代理最终的结构化报告（含来源链接），避免上下文膨胀
+  - 浏览器接管（CDP）工具：`browser_tabs` / `browser_read` / `browser_screenshot` / `browser_navigate` / `browser_click` / `browser_type` — 通过 `chromium.connectOverCDP` 连接用户本机已启动的真实浏览器（Edge/Chrome，`--remote-debugging-port` 启动，Windows 下双击 `scripts/start-browser-cdp.bat` 即可，独立配置目录 `.biji-browser` 持久化登录态）。直接读已打开、已登录、已过反爬验证的页面，比 web_fetch 可靠；正文提取复用 web_fetch 同款 Readability+Turndown 逻辑（`services/extract.ts`）。`browser_navigate/click/type` 会真实改变浏览器状态，仅在用户明确示意时使用
+  - CDP 门控：浏览器控制是否启用、连接哪个地址由设置（`app_settings` 的 `browserCdpEnabled`/`browserCdpUrl`，设置页可配，也可用 `BROWSER_CDP_URL` 环境变量，设置值优先）决定；未启用时 browser_* 工具**不挂载**到 agent（`createNoteTools` 按设置过滤），设置页「Agent 能力」中 browser_* 勾选也会置灰
+  - `browser_screenshot` 截图保存到 `dataDir/screenshots/`，经 `GET /api/screenshots/:file` 提供，返回 `/api/screenshots/xxx.png` 可直接作为 markdown 图片插入笔记
+  - CDP 未连接（调试端口没开）时工具返回友好错误并提示启动方式，不崩 agent；连接失败/断开自动重连，`SIGINT/SIGTERM` 时断开
+  - 连接状态接口：`GET /api/browser/status`（当前配置 + 连通性 + 打开标签页）、`POST /api/browser/test`（用指定地址试连一次，不落库）、`POST /api/browser/disconnect`（断开但不关闭用户浏览器）
+  - 跨机器（bi-ji 服务与浏览器不在同一台电脑）：`.bat` 支持 `BIJI_CDP_ADDR` 放开局域网监听，配合浏览器所在电脑的防火墙放行调试端口；CDP 开放到局域网等于任何人可控该浏览器，教程中提示仅限可信内网使用
+  - 跨网段 / NAT 场景：两台电脑互相访问不到时可用 SSH 隧道（`ssh -R 9222:127.0.0.1:9222`，由浏览器所在电脑发起，Linux 端只需访问 `127.0.0.1:9222`，无需开防火墙与监听），完整文档见 `docs/browser-cdp-ssh.md`，设置页教程中也给出了入口提示
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表（含 `set_note_tags`）
 - AI 修改记录页 `/ai-logs`（顶部导航「AI 记录」）：列出 `ai_change_logs`，按笔记/动作筛选、分页加载；每条记录展示动作徽标、笔记标题、摘要、前后字符数与时间，点击展开查看 before→after 的行级 diff（`GET /api/ai-logs`、`GET /api/ai-logs/:id`）；支持单条删除（展开后 🗑）与清空（`DELETE /api/ai-logs/:id`、`DELETE /api/ai-logs`，清空可限定当前筛选条件）
 - 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片
@@ -86,11 +93,12 @@
 
 ## 设置
 
-- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「Agent 能力」「MCP 服务器」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
+- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「Agent 能力」「浏览器控制」「MCP 服务器」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
 - 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型/Agent、`mcp*` MCP 服务器、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
 - 大模型配置：在线修改 Base URL / API Key / 模型名，覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
-- Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效
+- Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/browser_tabs/browser_read/browser_screenshot/browser_navigate/browser_click/browser_type/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效；browser_* 工具带 `requires: 'cdp'` 标记，未启用浏览器控制时在设置页置灰不可勾选
+- 浏览器控制设置（`browserCdpEnabled` / `browserCdpUrl`，`browser_*` 工具与后端状态接口共用）：开关 + CDP 调试地址 + 「测试连接」（`POST /api/browser/test`，用页面填的地址试连并列出标签页）+ 「断开连接」+ 连接状态卡片（`GET /api/browser/status`）；内置使用教程，展示 `scripts/start-browser-cdp.bat` 完整内容（一键复制），分 Windows 端启动、跨机器（Linux 服务 + Windows 浏览器）网络配置、启用三步骤，并提示 CDP 局域网开放的安全风险
 - MCP 服务器设置（`mcpServers`，JSON 数组）：通过 MCP 协议把外部服务器的工具挂载给主代理与调研子代理，用于扩展 Agent 能力；设置页以「列表 + 弹窗编辑」方式配置（不再手写 JSON），每行可开关启用（`enabled` 字段，未启用不挂载工具），下方「工具预览」连接各服务器列出其提供的工具；每项含 `name`（唯一标识，也是工具名前缀）、`type`（http/sse/stdio）、`url`（http/sse 用）、`headers`（http/sse 可选）、`command/args/env`（stdio 用）；加载的工具以 `mcp__{服务器名}__{工具名}` 命名避免与内置工具冲突，配置不变时结果按配置签名缓存复用（不重连），连接失败的服务器跳过并记录错误
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性；`POST /api/mcp/test` 试连所有配置的 MCP 服务器并列出其可用工具
 

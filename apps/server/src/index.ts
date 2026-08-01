@@ -11,7 +11,10 @@ import { aiLogsRoutes } from './routes/ai-logs.js'
 import { settingsRoutes } from './routes/settings.js'
 import { backupRoutes } from './routes/backup.js'
 import { mcpRoutes } from './routes/mcp.js'
+import { screenshotsRoutes } from './routes/screenshots.js'
+import { browserRoutes } from './routes/browser.js'
 import { closeBrowser } from './services/browser.js'
+import { closeCdpBrowser } from './services/cdp.js'
 import { initSettingsCache } from './services/settings.js'
 
 await initDb()
@@ -31,6 +34,8 @@ app.route('/api/ai-logs', aiLogsRoutes)
 app.route('/api/settings', settingsRoutes)
 app.route('/api/backup', backupRoutes)
 app.route('/api/mcp', mcpRoutes)
+app.route('/api/screenshots', screenshotsRoutes)
+app.route('/api/browser', browserRoutes)
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`)
@@ -38,6 +43,6 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
-    void closeBrowser().finally(() => process.exit(0))
+    void Promise.all([closeBrowser(), closeCdpBrowser()]).finally(() => process.exit(0))
   })
 }

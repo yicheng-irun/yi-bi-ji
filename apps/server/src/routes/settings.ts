@@ -12,6 +12,7 @@ settingsRoutes.put('/', async (c) => {
   const clean: Record<string, string> = {}
   const keys: (keyof Settings)[] = [
     'aiBaseURL', 'aiApiKey', 'aiModel', 'reasoningEffort', 'aiTools', 'aiSubagentTools', 'mcpServers',
+    'browserCdpEnabled', 'browserCdpUrl',
     'backupType', 'backupPath', 'backupHost', 'backupPort', 'backupUser', 'backupPassword', 'backupDatabase',
   ]
   for (const key of keys) {

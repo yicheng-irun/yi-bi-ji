@@ -1,13 +1,10 @@
 import { chromium } from 'playwright-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
-import { Readability } from '@mozilla/readability'
-import { parseHTML } from 'linkedom'
-import TurndownService from 'turndown'
-import { gfm } from 'turndown-plugin-gfm'
 import type { Browser } from 'playwright'
 import fs from 'node:fs'
 import os from 'node:os'
 import { env } from '../env.js'
+import { extractPageContent, normalizeText } from './extract.js'
 
 chromium.use(StealthPlugin())
 
@@ -104,32 +101,6 @@ function looksLikeChallenge(title: string, text: string) {
 }
 
 type Page = Awaited<ReturnType<Browser['newPage']>>
-
-const turndown = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-  bulletListMarker: '-',
-  emDelimiter: '*',
-  linkStyle: 'inlined',
-})
-turndown.use(gfm)
-
-function absolutizeLinks(html: string, baseUrl: string): string {
-  try {
-    const { document } = parseHTML(html)
-    for (const a of document.querySelectorAll('a[href]')) {
-      const href = a.getAttribute('href')
-      if (href) a.setAttribute('href', new URL(href, baseUrl).href)
-    }
-    for (const img of document.querySelectorAll('img[src]')) {
-      const src = img.getAttribute('src')
-      if (src) img.setAttribute('src', new URL(src, baseUrl).href)
-    }
-    return document.toString()
-  } catch {
-    return html
-  }
-}
 
 async function waitForDomStable(page: Page, quietMs = 1200, maxWait = 8000) {
   await page
@@ -286,21 +257,14 @@ export async function fetchWebPage(
     let text = ''
     let md = ''
     let articleTitle = title
-    try {
-      const { document } = parseHTML(html)
-      const article = new Readability(document).parse()
-      if (article?.textContent) {
-        text = article.textContent
-        articleTitle = article.title || title
-        if (format === 'markdown' && article.content) {
-          md = turndown.turndown(absolutizeLinks(article.content, page.url()))
-        }
-      }
-    } catch {
-      // fall through to body text
+    const extracted = extractPageContent(html, page.url())
+    if (extracted.text) {
+      text = extracted.text
+      articleTitle = extracted.title || title
+      md = extracted.markdown
     }
     if (format === 'markdown' && md.trim()) {
-      md = md.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+$/gm, '').trim()
+      md = normalizeText(md)
       if (!md) return { ok: false, url, reason: '页面没有可提取的内容' }
       const s = Math.max(0, start)
       return {

@@ -16,4 +16,5 @@ export const env = {
   aiModel: process.env.AI_MODEL ?? 'gpt-4o-mini',
   dataDir: path.resolve(process.env.DATA_DIR ?? path.join(process.cwd(), 'data')),
   browserHeadless: process.env.BROWSER_HEADLESS !== 'false' && process.env.BROWSER_HEADLESS !== '0',
+  browserCdpUrl: process.env.BROWSER_CDP_URL ?? '',
 }

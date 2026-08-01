@@ -157,6 +157,11 @@ export const api = {
     request<{ ok: boolean; counts?: Record<string, number>; error?: string }>('/api/backup/sync', { method: 'POST', body: '{}' }),
   testMcp: (mcpServers: string) =>
     request<McpTestResult>('/api/mcp/test', { method: 'POST', body: JSON.stringify({ mcpServers }) }),
+  getBrowserStatus: () => request<BrowserStatus>('/api/browser/status'),
+  testBrowser: (url: string) =>
+    request<BrowserTestResult>('/api/browser/test', { method: 'POST', body: JSON.stringify({ url }) }),
+  disconnectBrowser: () =>
+    request<{ ok: boolean }>('/api/browser/disconnect', { method: 'POST', body: '{}' }),
 }
 
 export interface McpToolInfo {
@@ -210,6 +215,8 @@ export interface Settings {
   aiTools: string
   aiSubagentTools: string
   mcpServers: string
+  browserCdpEnabled: string
+  browserCdpUrl: string
   backupType: string
   backupPath: string
   backupHost: string
@@ -219,17 +226,48 @@ export interface Settings {
   backupDatabase: string
 }
 
+export interface CdpTabInfo {
+  index: number
+  title: string
+  url: string
+}
+
+export interface BrowserStatus {
+  enabled: boolean
+  url: string
+  connected: boolean
+  version?: string
+  tabs?: CdpTabInfo[]
+  reason?: string
+}
+
+export interface BrowserTestResult {
+  ok: boolean
+  url: string
+  version?: string
+  tabs?: CdpTabInfo[]
+  reason?: string
+}
+
 /** Agent 工具元信息，用于设置页勾选「可用工具」 */
 export interface AgentToolInfo {
   name: string
   label: string
   hint: string
+  /** 该工具的前置依赖：'cdp' 表示需在「浏览器控制」启用后才能勾选/使用 */
+  requires?: 'cdp'
 }
 
 export const AGENT_TOOLS: AgentToolInfo[] = [
   { name: 'web_search', label: '联网搜索', hint: '在互联网上搜索资料、新闻' },
   { name: 'web_fetch', label: '网页抓取', hint: '打开网页提取正文（Markdown）' },
   { name: 'deep_research', label: '深度调研子代理', hint: '派出联网研究子代理做复杂调研' },
+  { name: 'browser_tabs', label: '浏览器·标签页', hint: '列出本机浏览器打开的标签页', requires: 'cdp' },
+  { name: 'browser_read', label: '浏览器·读取', hint: '读取已打开页面正文（可过登录/反爬）', requires: 'cdp' },
+  { name: 'browser_screenshot', label: '浏览器·截图', hint: '截取当前页面并存入笔记', requires: 'cdp' },
+  { name: 'browser_navigate', label: '浏览器·跳转', hint: '让浏览器跳转/新开网页', requires: 'cdp' },
+  { name: 'browser_click', label: '浏览器·点击', hint: '点击页面元素（真实操作）', requires: 'cdp' },
+  { name: 'browser_type', label: '浏览器·输入', hint: '在输入框中输入文字（真实操作）', requires: 'cdp' },
   { name: 'list_notes', label: '列出笔记', hint: '概览库中所有笔记' },
   { name: 'search_notes', label: '搜索笔记', hint: '按关键词模糊搜索笔记' },
   { name: 'read_note', label: '读取笔记', hint: '读取笔记草稿内容（支持行范围）' },

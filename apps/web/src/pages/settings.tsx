@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, AGENT_TOOLS, ALL_TOOLS_SENTINEL, SUBAGENT_TOOLS, type AgentToolInfo, type McpServerDraft, type McpTestResult, parseMcpServers, serializeMcpServers, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
+import { api, AGENT_TOOLS, ALL_TOOLS_SENTINEL, SUBAGENT_TOOLS, type AgentToolInfo, type CdpTabInfo, type McpServerDraft, type McpTestResult, parseMcpServers, serializeMcpServers, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -134,7 +134,7 @@ const ToolGrid = styled.div`
   display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px;
 `
 
-const ToolRow = styled.label`
+const ToolRow = styled.label<{ $locked?: boolean }>`
   display: flex; align-items: flex-start; gap: 10px;
   padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--bg-card); cursor: pointer;
@@ -144,6 +144,12 @@ const ToolRow = styled.label`
   .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .name { font-size: 13px; font-weight: 600; color: var(--text); }
   .hint { font-size: 12px; color: var(--text-muted); }
+  ${(p) =>
+    p.$locked
+      ? `opacity: .5; cursor: not-allowed; pointer-events: none;
+         border-style: dashed;
+         .name { color: var(--text-secondary); }`
+      : ''}
 `
 
 const ToolGridHeader = styled.div`
@@ -151,9 +157,55 @@ const ToolGridHeader = styled.div`
   .toggle-all { font-size: 12px; color: var(--accent); cursor: pointer; border: none; background: none; padding: 0; &:hover { text-decoration: underline; } }
 `
 
+const EnableRow = styled.div`
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; font-weight: 600; color: var(--text);
+`
+
+const CodeBlock = styled.div`
+  position: relative; margin-top: 10px;
+  pre {
+    margin: 0; padding: 14px; border-radius: var(--radius);
+    background: #0f1419; color: #d7e0ea; font-family: var(--font-mono);
+    font-size: 12.5px; line-height: 1.7; overflow: auto;
+    white-space: pre; max-height: 360px;
+  }
+  .copy {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 12px; color: #9fb0c3; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
+    padding: 3px 10px; cursor: pointer;
+    &:hover { color: #fff; background: rgba(255,255,255,.15); }
+  }
+`
+
+const Steps = styled.ol`
+  margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.9; color: var(--text-secondary);
+  li > b { color: var(--text); }
+  code { font-family: var(--font-mono); font-size: 12px; background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; }
+`
+
+const TabList = styled.ul`
+  margin: 8px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 6px;
+  li {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-family: var(--font-mono);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 10px; background: var(--bg-card);
+    .idx { color: var(--text-muted); flex-shrink: 0; }
+    .ttl { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+    .url { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+`
+
+const WARN = '⚠️'
+const WARNING_STYLE = { fontSize: 12.5, color: '#d97706', lineHeight: 1.7 } as const
+
 const TABS = [
   { key: 'ai', label: '大模型', icon: '🤖' },
   { key: 'agent', label: 'Agent 能力', icon: '🧩' },
+  { key: 'browser', label: '浏览器控制', icon: '🌐' },
   { key: 'mcp', label: 'MCP 服务器', icon: '🔌' },
   { key: 'backup', label: '数据备份', icon: '💾' },
 ] as const
@@ -178,6 +230,49 @@ interface Status {
 
 function emptyMcpServer(): McpServerDraft {
   return { name: '', type: 'http', url: '', enabled: true }
+}
+
+/** 与仓库 scripts/start-browser-cdp.bat 保持一致（教程展示用） */
+const START_BROWSER_BAT = `@echo off
+setlocal
+REM 以调试端口启动本机浏览器，供笔记 agent 通过 browser_* 工具接管。
+REM 使用独立配置目录（.biji-browser），不影响正常浏览器使用；登录态保存在该目录。
+REM
+REM 默认只在本机(127.0.0.1)监听。若 bi-ji 服务跑在其它机器（如 Linux），需放开监听并放行防火墙：
+REM   set BIJI_CDP_ADDR=0.0.0.0
+REM   并在 Windows 防火墙放行 TCP %CDP_PORT% 入站。
+
+set CDP_PORT=9222
+set CDP_ADDR=%BIJI_CDP_ADDR%
+if "%CDP_ADDR%"=="" set CDP_ADDR=127.0.0.1
+set PROFILE=%USERPROFILE%\\.biji-browser
+if not exist "%PROFILE%" mkdir "%PROFILE%"
+
+echo 正在以调试端口 %CDP_PORT%（监听 %CDP_ADDR%）启动浏览器，配置目录：%PROFILE%
+echo 第一次使用请在弹出的窗口里登录你需要的网站，之后 agent 就能读取/操作这些页面。
+echo 保持该浏览器窗口运行即可，不要手动关闭。
+
+set LAUNCHED=
+where msedge.exe >nul 2>nul
+if not errorlevel 1 set LAUNCHED=msedge.exe
+if not defined LAUNCHED where chrome.exe >nul 2>nul
+if not errorlevel 1 if not defined LAUNCHED set LAUNCHED=chrome.exe
+if not defined LAUNCHED (
+  echo 未找到 msedge.exe / chrome.exe，请将浏览器加入 PATH 或手动用以下命令启动：
+  echo   msedge --remote-debugging-port=%CDP_PORT% --remote-debugging-address=%CDP_ADDR% --user-data-dir="%PROFILE%"
+  exit /b 1
+)
+
+start "" "%LAUNCHED%" --remote-debugging-port=%CDP_PORT% --remote-debugging-address=%CDP_ADDR% --user-data-dir="%PROFILE%" --no-first-run
+endlocal
+`
+
+interface BrowserInfo {
+  connected: boolean
+  url: string
+  version?: string
+  tabs?: CdpTabInfo[]
+  reason?: string
 }
 
 function McpEditorModal({ server, existingNames, onSave, onClose }: {
@@ -305,6 +400,8 @@ export default function SettingsPage() {
   const [lastCounts, setLastCounts] = useState<Record<string, number> | null>(null)
   const [mcpTest, setMcpTest] = useState<McpTestResult | null>(null)
   const [mcpEditor, setMcpEditor] = useState<{ index: number; server: McpServerDraft } | null>(null)
+  const [browserInfo, setBrowserInfo] = useState<BrowserInfo | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     api.getSettings().then(setForm).catch((e) => {
@@ -312,6 +409,14 @@ export default function SettingsPage() {
       setStatus({ ok: false, text: '加载设置失败' })
     })
   }, [])
+
+  useEffect(() => {
+    if (tab === 'browser') {
+      api.getBrowserStatus().then((r) => {
+        setBrowserInfo({ connected: r.connected, url: r.url, version: r.version, tabs: r.tabs, reason: r.reason })
+      }).catch(() => {})
+    }
+  }, [tab])
 
   if (!form) return <Loading />
 
@@ -397,6 +502,45 @@ export default function SettingsPage() {
     }
   }
 
+  const testBrowser = async () => {
+    setStatus(null)
+    setBusy('test-browser')
+    try {
+      const r = await api.testBrowser(form.browserCdpUrl)
+      setBrowserInfo({ connected: r.ok, url: r.url, version: r.version, tabs: r.tabs, reason: r.reason })
+      setStatus(
+        r.ok
+          ? { ok: true, text: `连接成功（${r.version}），${r.tabs?.length ?? 0} 个标签页` }
+          : { ok: false, text: r.reason || '连接失败' },
+      )
+    } catch (e) {
+      setStatus({ ok: false, text: (e as Error).message || '测试失败' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const disconnectBrowser = async () => {
+    setStatus(null)
+    try {
+      await api.disconnectBrowser()
+      setBrowserInfo(null)
+      setStatus({ ok: true, text: '已断开（不会关闭你的浏览器，下次操作自动重连）' })
+    } catch (e) {
+      setStatus({ ok: false, text: (e as Error).message || '断开失败' })
+    }
+  }
+
+  const copyBat = async () => {
+    try {
+      await navigator.clipboard.writeText(START_BROWSER_BAT)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setStatus({ ok: false, text: '复制失败，请手动选择复制' })
+    }
+  }
+
   const mcpServers = parseMcpServers(form.mcpServers)
 
   const setMcpServers = (servers: McpServerDraft[]) => {
@@ -452,19 +596,23 @@ export default function SettingsPage() {
         </ToolGridHeader>
         <div className="hint">{hint}</div>
         <ToolGrid>
-          {tools.map((t) => (
-            <ToolRow key={t.name}>
-              <input
-                type="checkbox"
-                checked={selected.has(t.name)}
-                onChange={() => toggleTool(key, t.name, tools)}
-              />
-              <span className="info">
-                <span className="name">{t.label}</span>
-                <span className="hint">{t.hint}</span>
-              </span>
-            </ToolRow>
-          ))}
+          {tools.map((t) => {
+            const locked = t.requires === 'cdp' && form.browserCdpEnabled !== '1'
+            return (
+              <ToolRow key={t.name} $locked={locked}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(t.name)}
+                  disabled={locked}
+                  onChange={() => toggleTool(key, t.name, tools)}
+                />
+                <span className="info">
+                  <span className="name">{t.label}</span>
+                  <span className="hint">{locked ? `${t.hint}（需先在「浏览器控制」启用）` : t.hint}</span>
+                </span>
+              </ToolRow>
+            )
+          })}
         </ToolGrid>
         <Actions>
           <Button variant="primary" onClick={() => void save()} disabled={saving}>
@@ -532,15 +680,135 @@ export default function SettingsPage() {
               {renderToolGrid(
                 'aiTools',
                 '主代理可用工具',
-                '主代理（侧边栏对话）可调用的工具，默认全部勾选。取消勾选的工具将被禁用。',
+                '主代理（侧边栏对话）可调用的工具，默认全部勾选。取消勾选的工具将被禁用。browser_* 工具需先在「浏览器控制」启用才可勾选。',
                 AGENT_TOOLS,
               )}
               {renderToolGrid(
                 'aiSubagentTools',
                 '调研子代理可用工具',
-                '深度调研子代理可调用的工具（不含 deep_research 本身），默认全部勾选。',
+                '深度调研子代理可调用的工具（不含 deep_research 本身），默认全部勾选。browser_* 工具需先在「浏览器控制」启用才可勾选。',
                 SUBAGENT_TOOLS,
               )}
+            </>
+          )}
+
+          {tab === 'browser' && (
+            <>
+              <Card>
+                <h3>浏览器控制（CDP）</h3>
+                <div className="hint">
+                  让笔记 agent 通过 CDP 直接操作已打开的真实浏览器：读取已登录、已过反爬的页面，点击输入，截图存档。
+                  浏览器和 bi-ji 服务可以在同一台电脑上，也可以在不同电脑上（这台控制那台）。需先在有浏览器的那台电脑上以调试端口启动浏览器（见下方教程）。未启用时 browser_* 工具不会被挂载。
+                </div>
+                <EnableRow>
+                  <Toggle
+                    $on={form.browserCdpEnabled === '1'}
+                    title={form.browserCdpEnabled === '1' ? '已启用' : '已停用'}
+                    onClick={() => set('browserCdpEnabled', form.browserCdpEnabled === '1' ? '0' : '1')}
+                  />
+                  <span>启用浏览器控制</span>
+                </EnableRow>
+                <Field>
+                  <label>CDP 调试地址</label>
+                  <Input
+                    value={form.browserCdpUrl}
+                    placeholder="http://127.0.0.1:9222"
+                    onChange={(e) => set('browserCdpUrl', e.target.value)}
+                  />
+                  <div className="hint">
+                    同一台电脑：http://127.0.0.1:9222；不在同一台电脑：http://&lt;浏览器所在电脑的 IP&gt;:9222（需在浏览器那台电脑上放开监听并放行防火墙，见教程第 2 步）。
+                    也可用环境变量 BROWSER_CDP_URL 配置，设置里填的值优先。
+                  </div>
+                </Field>
+                <Actions>
+                  <Button variant="primary" onClick={() => void save()} disabled={saving}>
+                    {saving ? '保存中…' : '保存'}
+                  </Button>
+                  <Button onClick={() => void testBrowser()} disabled={busy !== null}>
+                    {busy === 'test-browser' ? '连接中…' : '测试连接'}
+                  </Button>
+                  <Button onClick={() => void disconnectBrowser()} disabled={busy !== null}>断开连接</Button>
+                  {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
+                </Actions>
+              </Card>
+
+              <Card>
+                <h3>连接状态</h3>
+                <div className="hint">
+                  打开本页或点击「测试连接」时刷新；「断开连接」不会关闭你的浏览器，下次操作会自动重连。
+                </div>
+                {!browserInfo ? (
+                  <div className="hint" style={{ padding: '12px 0' }}>尚未检测，点「测试连接」查看。</div>
+                ) : (
+                  <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div>
+                      地址：<code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{browserInfo.url}</code>
+                    </div>
+                    <div>
+                      状态：
+                      {browserInfo.connected ? (
+                        <b style={{ color: 'var(--green)' }}>已连接</b>
+                      ) : (
+                        <b style={{ color: 'var(--red)' }}>未连接</b>
+                      )}
+                      {browserInfo.version && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>{browserInfo.version}</span>}
+                    </div>
+                    {browserInfo.reason && (
+                      <div className="hint" style={{ wordBreak: 'break-all' }}>{browserInfo.reason}</div>
+                    )}
+                    {(browserInfo.tabs?.length ?? 0) > 0 && (
+                      <>
+                        <div>当前打开的标签页（{browserInfo.tabs?.length}）：</div>
+                        <TabList>
+                          {browserInfo.tabs?.map((t) => (
+                            <li key={t.index}>
+                              <span className="idx">#{t.index}</span>
+                              <span className="ttl">{t.title}</span>
+                              <span className="url">{t.url}</span>
+                            </li>
+                          ))}
+                        </TabList>
+                      </>
+                    )}
+                  </div>
+                )}
+              </Card>
+
+              <Card>
+                <h3>使用教程</h3>
+                <div style={{ fontSize: 13, lineHeight: 1.9, color: 'var(--text-secondary)' }}>
+                  适用于两种常见情况：浏览器和 bi-ji 服务装在同一台电脑；或者这台电脑跑 bi-ji，控制另一台电脑上的浏览器。
+                </div>
+                <Steps>
+                  <li>
+                    <b>在有浏览器的那台电脑上启动调试浏览器。</b>
+                    把下面的内容保存为 <code>start-browser-cdp.bat</code> 双击运行（仓库 <code>scripts/start-browser-cdp.bat</code> 已有）。
+                    它会用独立配置目录启动 Edge/Chrome，第一次打开时登录你需要的网站，登录态会一直保存在那个窗口里；保持窗口开着即可。
+                  </li>
+                  <li>
+                    <b>让跑 bi-ji 的那台电脑能连上它。</b>
+                    浏览器和 bi-ji 在同一台电脑：地址填 <code>http://127.0.0.1:9222</code> 即可。
+                    不在同一台电脑：先在 .bat 前面加一行 <code>set BIJI_CDP_ADDR=0.0.0.0</code>（放开局域网监听），再在浏览器那台电脑的防火墙放行 TCP 9222 入站，最后把地址填成 <code>http://&lt;浏览器所在电脑的 IP&gt;:9222</code>。
+                  </li>
+                  <li>
+                    <b>启用并保存。</b>
+                    打开上方「启用浏览器控制」→ 填地址 → 「测试连接」确认 → 保存。之后「Agent 能力」里的 browser_* 工具才可勾选，agent 就能读页面 / 点击 / 截图了。
+                  </li>
+                </Steps>
+                <div style={{ fontSize: 12.5, lineHeight: 1.9, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  <b>两台电脑互相访问不到（不同网段 / NAT 后面）？</b> 用 SSH 隧道代替：在浏览器那台电脑上执行{' '}
+                  <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>ssh -N -R 9222:127.0.0.1:9222 用户@bi-ji所在电脑地址</code>
+                  ，然后这里地址填 <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>http://127.0.0.1:9222</code> 即可，
+                  不用开防火墙。详细步骤见仓库文档 <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>docs/browser-cdp-ssh.md</code>。
+                </div>
+                <div style={WARNING_STYLE}>
+                  {WARN} 安全提示：CDP 允许任何人完全控制你的浏览器窗口。直接跨机器开启时请只在可信内网使用，建议用 <code>BIJI_CDP_ADDR</code> 只绑定到 bi-ji 服务的 IP；用 SSH 隧道则无需开放监听和防火墙。
+                </div>
+                <CodeBlock>
+                  <button className="copy" onClick={() => void copyBat()}>{copied ? '已复制 ✓' : '复制'}</button>
+                  <pre>{START_BROWSER_BAT}</pre>
+                </CodeBlock>
+              </Card>
             </>
           )}
 

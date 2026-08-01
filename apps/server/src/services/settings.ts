@@ -12,6 +12,10 @@ export interface Settings {
   aiSubagentTools: string
   /** MCP 服务器配置 JSON（数组），用于扩展 agent 工具能力 */
   mcpServers: string
+  /** 浏览器控制（CDP）：是否启用 browser_* 工具，'1' 启用 / '0' 或空禁用 */
+  browserCdpEnabled: string
+  /** 浏览器控制（CDP）：本机/远程浏览器调试地址，如 http://192.168.1.10:9222 */
+  browserCdpUrl: string
   backupType: string
   backupPath: string
   backupHost: string
@@ -37,6 +41,8 @@ export function getSettings(): Settings {
     aiTools: cache.aiTools ?? '*',
     aiSubagentTools: cache.aiSubagentTools ?? '*',
     mcpServers: cache.mcpServers ?? '',
+    browserCdpEnabled: cache.browserCdpEnabled ?? (env.browserCdpUrl ? '1' : '0'),
+    browserCdpUrl: cache.browserCdpUrl ?? env.browserCdpUrl ?? 'http://127.0.0.1:9222',
     backupType: cache.backupType ?? 'sqlite',
     backupPath: cache.backupPath ?? '',
     backupHost: cache.backupHost ?? '',

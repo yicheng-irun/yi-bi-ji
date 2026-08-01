@@ -3,10 +3,13 @@ import { z } from 'zod'
 import { ChatThread } from '../db/models.js'
 import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
 import { persistMessages } from '../services/chat.js'
+import { getSettings } from '../services/settings.js'
 import { createWebTools } from './web-tools.js'
+import { createBrowserTools } from './browser-tools.js'
 import { createResearchSubagent } from './subagents.js'/** 主代理全部可用工具（含联网与深度调研） */
 export const MAIN_AGENT_TOOLS = [
   'web_search', 'web_fetch', 'deep_research',
+  'browser_tabs', 'browser_read', 'browser_screenshot', 'browser_navigate', 'browser_click', 'browser_type',
   'list_notes', 'search_notes', 'read_note', 'create_note', 'set_note_tags',
   'write_note', 'replace_in_note', 'insert_block', 'delete_note',
 ] as const
@@ -45,8 +48,11 @@ export function createNoteTools(
   subagentEnabledTools: Set<string> | null = null,
   mcpTools: ToolSet = {},
 ) {
+  const s = getSettings()
+  const browserToolsEnabled = s.browserCdpEnabled === '1' && !!s.browserCdpUrl?.trim()
   const tools = {
     ...createWebTools(),
+    ...(browserToolsEnabled ? createBrowserTools() : {}),
 
     deep_research: tool({
       description:
