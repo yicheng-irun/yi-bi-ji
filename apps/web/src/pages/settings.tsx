@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
+import { api, AGENT_TOOLS, ALL_TOOLS_SENTINEL, SUBAGENT_TOOLS, type AgentToolInfo, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -72,8 +72,30 @@ const CountGrid = styled.div`
   }
 `
 
+const ToolGrid = styled.div`
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px;
+`
+
+const ToolRow = styled.label`
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-card); cursor: pointer;
+  transition: border-color .15s, background .15s;
+  &:hover { border-color: var(--accent); background: var(--bg-hover); }
+  input { accent-color: var(--accent); margin-top: 3px; flex-shrink: 0; }
+  .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .hint { font-size: 12px; color: var(--text-muted); }
+`
+
+const ToolGridHeader = styled.div`
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  .toggle-all { font-size: 12px; color: var(--accent); cursor: pointer; border: none; background: none; padding: 0; &:hover { text-decoration: underline; } }
+`
+
 const TABS = [
   { key: 'ai', label: '大模型', icon: '🤖' },
+  { key: 'agent', label: 'Agent 能力', icon: '🧩' },
   { key: 'backup', label: '数据备份', icon: '💾' },
 ] as const
 
@@ -172,6 +194,59 @@ export default function SettingsPage() {
     }
   }
 
+  const selectedToolSet = (raw: string, all: AgentToolInfo[]) =>
+    raw === ALL_TOOLS_SENTINEL || !raw
+      ? new Set(all.map((t) => t.name))
+      : new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+
+  const toggleTool = (key: 'aiTools' | 'aiSubagentTools', name: string, all: AgentToolInfo[]) => {
+    const cur = selectedToolSet(form[key], all)
+    if (cur.has(name)) cur.delete(name)
+    else cur.add(name)
+    set(key, cur.size >= all.length ? ALL_TOOLS_SENTINEL : [...cur].join(','))
+  }
+
+  const setAllTools = (key: 'aiTools' | 'aiSubagentTools', all: AgentToolInfo[], on: boolean) => {
+    set(key, on ? ALL_TOOLS_SENTINEL : '')
+  }
+
+  const renderToolGrid = (key: 'aiTools' | 'aiSubagentTools', title: string, hint: string, tools: AgentToolInfo[]) => {
+    const selected = selectedToolSet(form[key], tools)
+    const allOn = selected.size >= tools.length
+    return (
+      <Card>
+        <ToolGridHeader>
+          <h3>{title}</h3>
+          <button className="toggle-all" onClick={() => setAllTools(key, tools, !allOn)}>
+            {allOn ? '全不选' : '全选'}
+          </button>
+        </ToolGridHeader>
+        <div className="hint">{hint}</div>
+        <ToolGrid>
+          {tools.map((t) => (
+            <ToolRow key={t.name}>
+              <input
+                type="checkbox"
+                checked={selected.has(t.name)}
+                onChange={() => toggleTool(key, t.name, tools)}
+              />
+              <span className="info">
+                <span className="name">{t.label}</span>
+                <span className="hint">{t.hint}</span>
+              </span>
+            </ToolRow>
+          ))}
+        </ToolGrid>
+        <Actions>
+          <Button variant="primary" onClick={() => void save()} disabled={saving}>
+            {saving ? '保存中…' : '保存'}
+          </Button>
+          {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
+        </Actions>
+      </Card>
+    )
+  }
+
   return (
     <Page>
       <Body>
@@ -220,6 +295,23 @@ export default function SettingsPage() {
                 {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
               </Actions>
             </Card>
+          )}
+
+          {tab === 'agent' && (
+            <>
+              {renderToolGrid(
+                'aiTools',
+                '主代理可用工具',
+                '主代理（侧边栏对话）可调用的工具，默认全部勾选。取消勾选的工具将被禁用。',
+                AGENT_TOOLS,
+              )}
+              {renderToolGrid(
+                'aiSubagentTools',
+                '调研子代理可用工具',
+                '深度调研子代理可调用的工具（不含 deep_research 本身），默认全部勾选。',
+                SUBAGENT_TOOLS,
+              )}
+            </>
           )}
 
           {tab === 'backup' && (

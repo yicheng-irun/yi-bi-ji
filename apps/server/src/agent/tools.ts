@@ -1,4 +1,4 @@
-import { readUIMessageStream, toUIMessageStream, tool, type UIMessage } from 'ai'
+import { readUIMessageStream, toUIMessageStream, tool, type ToolSet, type UIMessage } from 'ai'
 import { z } from 'zod'
 import { ChatThread } from '../db/models.js'
 import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
@@ -6,8 +6,31 @@ import { persistMessages } from '../services/chat.js'
 import { createWebTools } from './web-tools.js'
 import { createResearchSubagent } from './subagents.js'
 
-export function createNoteTools(threadId: string) {
-  return {
+/** 主代理全部可用工具（含联网与深度调研） */
+export const MAIN_AGENT_TOOLS = [
+  'web_search', 'web_fetch', 'deep_research',
+  'list_notes', 'search_notes', 'read_note', 'create_note', 'set_note_tags',
+  'write_note', 'replace_in_note', 'insert_block', 'delete_note',
+] as const
+
+/** 调研子代理全部可用工具（不含 deep_research，避免递归） */
+export const SUBAGENT_TOOLS = MAIN_AGENT_TOOLS.filter((n) => n !== 'deep_research')
+
+export const ALL_TOOLS_SENTINEL = '*'
+
+/** 解析设置里的工具列表字符串：'*' / 未配置 → null（全部可用）；'' → 空集合（全部禁用）；否则返回启用集合 */
+export function parseEnabledTools(raw: string | undefined | null): Set<string> | null {
+  if (raw == null || raw === ALL_TOOLS_SENTINEL) return null
+  return new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+}
+
+function pickTools<T extends Record<string, unknown>>(all: T, enabled: Set<string> | null): T {
+  if (!enabled) return all
+  return Object.fromEntries(Object.entries(all).filter(([name]) => enabled.has(name))) as T
+}
+
+export function createNoteTools(threadId: string, enabledTools: Set<string> | null = null, subagentEnabledTools: Set<string> | null = null) {
+  const tools = {
     ...createWebTools(),
 
     deep_research: tool({
@@ -29,7 +52,7 @@ export function createNoteTools(threadId: string) {
           }),
         })
 
-        const { deep_research: _exclude, ...subagentTools } = createNoteTools(subThreadId)
+        const { deep_research: _exclude, ...subagentTools } = createNoteTools(subThreadId, subagentEnabledTools)
         const subagent = createResearchSubagent(subagentTools)
         const result = await subagent.stream({ prompt: task, abortSignal })
 
@@ -181,6 +204,8 @@ export function createNoteTools(threadId: string) {
       },
     }),
   }
+
+  return pickTools(tools, enabledTools)
 }
 
 export type NoteTools = ReturnType<typeof createNoteTools>

@@ -162,6 +162,8 @@ export interface Settings {
   aiApiKey: string
   aiModel: string
   reasoningEffort: string
+  aiTools: string
+  aiSubagentTools: string
   backupType: string
   backupPath: string
   backupHost: string
@@ -170,6 +172,33 @@ export interface Settings {
   backupPassword: string
   backupDatabase: string
 }
+
+/** Agent 工具元信息，用于设置页勾选「可用工具」 */
+export interface AgentToolInfo {
+  name: string
+  label: string
+  hint: string
+}
+
+export const AGENT_TOOLS: AgentToolInfo[] = [
+  { name: 'web_search', label: '联网搜索', hint: '在互联网上搜索资料、新闻' },
+  { name: 'web_fetch', label: '网页抓取', hint: '打开网页提取正文（Markdown）' },
+  { name: 'deep_research', label: '深度调研子代理', hint: '派出联网研究子代理做复杂调研' },
+  { name: 'list_notes', label: '列出笔记', hint: '概览库中所有笔记' },
+  { name: 'search_notes', label: '搜索笔记', hint: '按关键词模糊搜索笔记' },
+  { name: 'read_note', label: '读取笔记', hint: '读取笔记草稿内容（支持行范围）' },
+  { name: 'create_note', label: '创建笔记', hint: '新建笔记（写入草稿）' },
+  { name: 'set_note_tags', label: '设置标签', hint: '整体设置笔记标签' },
+  { name: 'write_note', label: '全量写入', hint: '整体覆盖笔记草稿' },
+  { name: 'replace_in_note', label: '文本替换', hint: '在笔记中做字符串替换' },
+  { name: 'insert_block', label: '插入区块', hint: '在笔记中锚点插入 markdown 区块' },
+  { name: 'delete_note', label: '删除笔记', hint: '标记笔记待删除（软删除）' },
+]
+
+/** 调研子代理可用工具（不含 deep_research，避免递归） */
+export const SUBAGENT_TOOLS = AGENT_TOOLS.filter((t) => t.name !== 'deep_research')
+
+export const ALL_TOOLS_SENTINEL = '*'
 
 export const REASONING_EFFORT_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '不设置' },

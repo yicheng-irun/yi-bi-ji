@@ -6,6 +6,10 @@ export interface Settings {
   aiApiKey: string
   aiModel: string
   reasoningEffort: string
+  /** 主代理可用工具，逗号分隔；'*' 或不配置 = 全部可用 */
+  aiTools: string
+  /** 调研子代理可用工具，逗号分隔；'*' 或不配置 = 全部可用 */
+  aiSubagentTools: string
   backupType: string
   backupPath: string
   backupHost: string
@@ -28,6 +32,8 @@ export function getSettings(): Settings {
     aiApiKey: cache.aiApiKey ?? env.aiApiKey,
     aiModel: cache.aiModel ?? env.aiModel,
     reasoningEffort: cache.reasoningEffort ?? '',
+    aiTools: cache.aiTools ?? '*',
+    aiSubagentTools: cache.aiSubagentTools ?? '*',
     backupType: cache.backupType ?? 'sqlite',
     backupPath: cache.backupPath ?? '',
     backupHost: cache.backupHost ?? '',

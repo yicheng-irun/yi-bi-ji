@@ -1,7 +1,7 @@
 import { ToolLoopAgent, isStepCount } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { getSettings } from '../services/settings.js'
-import { createNoteTools } from './tools.js'
+import { createNoteTools, parseEnabledTools } from './tools.js'
 
 export function createNoteAgent(threadId: string) {
   const s = getSettings()
@@ -35,7 +35,11 @@ export function createNoteAgent(threadId: string) {
 4. 不要一次性把所有笔记塞入上下文；先搜索/列表，再按需读取。
 5. 用户当前正在查看的笔记 id 可能会在对话中提供，优先基于它工作。
 6. 用中文回复，保持简洁。`,
-    tools: createNoteTools(threadId),
+    tools: createNoteTools(
+      threadId,
+      parseEnabledTools(s.aiTools),
+      parseEnabledTools(s.aiSubagentTools),
+    ),
     stopWhen: isStepCount(50),
   })
 }

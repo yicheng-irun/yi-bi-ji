@@ -78,12 +78,18 @@
 - 事件类型：`note-updated` / `note-created` / `note-committed` / `note-deleted`
 - 前端笔记列表、编辑器、变更列表均通过 EventSource 实时响应变更
 
+## 数据安全（SQLite）
+
+- `sync({alter:true})` 在 SQLite 上重建表时会先建 `{表名}_backup` 临时表；若进程被中断（如 tsx watch 重启竞态），数据可能留在临时表而真实表为空
+- 启动 `initDb()` 时先处理遗留 `*_backup` 表：若真实表为空且临时表有数据，先把数据复制回真实表再删除临时表；并在 `sync` 前对 `notes.db` 做一次文件快照（`notes.db.pre-sync.bak`，每次启动覆盖），alter 出问题时可从快照找回
+
 ## 设置
 
-- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
-- 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
+- 设置页 `/settings`（顶部导航「设置」）：左侧按类别导航（当前为「大模型」「Agent 能力」「数据备份」，可扩展，`?tab=` 可深链），右侧为当前类别表单
+- 设置键按「作用域前缀」命名避免歧义：`ai*` 大模型/Agent、`backup*` 备份库、将来主库用 `db*`（`dbType`=sqlite/mysql、`dbPath`=sqlite 文件、`dbHost/dbPort/dbUser/dbPassword/dbDatabase`=mysql）
 - 大模型配置：在线修改 Base URL / API Key / 模型名，覆盖 `.env` 默认值，存 `app_settings` 表（内存缓存，启动时加载），保存后对新对话立即生效
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
+- Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性
 - 数据库备份（`POST /api/backup/test`、`POST /api/backup/sync`）：支持两种备份类型，类型与连接信息存 `app_settings` 的 `backup*` 键
   - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
