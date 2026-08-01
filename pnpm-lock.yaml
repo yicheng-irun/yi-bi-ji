@@ -8,6 +8,34 @@ importers:
 
   .: {}
 
+  apps/opencode-mcp:
+    dependencies:
+      '@hono/node-server':
+        specifier: latest
+        version: 2.0.12(hono@4.12.32)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.4.3)
+      hono:
+        specifier: latest
+        version: 4.12.32
+      zod:
+        specifier: latest
+        version: 4.4.3
+    devDependencies:
+      '@ai-sdk/mcp':
+        specifier: ^2.0.20
+        version: 2.0.20(zod@4.4.3)
+      '@types/node':
+        specifier: latest
+        version: 26.1.2
+      tsx:
+        specifier: latest
+        version: 4.23.1
+      typescript:
+        specifier: latest
+        version: 7.0.2
+
   apps/server:
     dependencies:
       '@ai-sdk/mcp':

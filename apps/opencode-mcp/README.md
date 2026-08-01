@@ -2,7 +2,7 @@
 
 opencode 的 MCP 桥接子应用：把常驻的 `opencode serve`（HTTP API）封装成标准 MCP 服务器，供 bi-ji 的笔记 agent 通过 MCP 调用，实现「在笔记对话里让 agent 驱动 opencode 做开发、查会话、续接对话」。
 
-> **当前状态：仅设计文档，未实现。** 开工时先通读本文档，按「实现清单」逐项落地。
+> **当前状态：已实现主体（bridge + MCP 工具 + 冒烟测试）。** 剩余：pm2 实际部署与 bi-ji 设置页联调、端到端验证、（可选）`opencodeSessionId` 续接增强。
 
 ## 背景与目标
 
@@ -52,11 +52,13 @@ apps/opencode-mcp/
   ecosystem.config.cjs      # pm2 配置
   .env.example
   src/
-    index.ts                # 入口：spawn opencode serve + 启动 MCP server（StreamableHTTP transport）
+    index.ts                # 入口：spawn opencode serve + 启动 MCP server（Hono + StreamableHTTP transport）
     opencode-client.ts      # fetch opencode HTTP API 的薄封装
     tools.ts                # MCP 工具定义（见「工具集」）
     serve-manager.ts        # opencode serve 子进程的 spawn / 健康检查 / 崩溃重启 / 退出清理
-  tests/                    # （可选，与 @bi-ji/server 同风格：tests/index.mts + helpers）
+    env.ts                  # .env 解析 + 配置
+  tests/
+    index.mts               # 冒烟测试：起 bridge + spawn serve，MCP 客户端验证工具注册与 status 调用
 ```
 
 ## 工具集（围绕会话生命周期建模）
@@ -77,17 +79,17 @@ apps/opencode-mcp/
 ## 实现要点
 
 ### 1. opencode serve 托管（serve-manager.ts）
-- 通过 `child_process.spawn` 启动 `opencode serve --port <port> --hostname 127.0.0.1`，`OPENCODE_URL` 可覆盖（兼容用户已手动跑的 serve，此时不 spawn）。
-- 启动后轮询 `GET /global/health` 直到就绪；进程退出码非 0 时自动重启（带退避）。
+- 通过 `child_process.spawn` 启动 `opencode serve --port <port> --hostname 127.0.0.1`，工作目录默认仓库根（`OPENCODE_PROJECT_DIR` 可覆盖）；`OPENCODE_URL` 可覆盖（兼容用户已手动跑的 serve，此时不 spawn）。
+- 启动后轮询 `GET /global/health` 直到就绪（健康检查请求带 3s 短超时，避免 serve 初始化慢时挂起）；进程退出码非 0 时自动重启（带退避）。
 - 进程退出时（SIGTERM/SIGINT）先 kill 子进程再退出。
 
 ### 2. MCP server（index.ts）
-- 用 `@modelcontextprotocol/sdk` 的 `StreamableHTTPTransport`（对应 opencode 侧的 http transport）。
+- 用 `@modelcontextprotocol/sdk` 的 `WebStandardStreamableHTTPServerTransport`，Hono 暴露 `app.all('/mcp', (c) => transport.handleRequest(c.req.raw))`（stateful，`sessionIdGenerator`），与 bi-ji 的 `@ai-sdk/mcp` http 客户端互通。
 - 注册上面 7~8 个工具；`opencode_client` 实例注入工具闭包。
 - 端口默认 `9410`（避免与 bi-ji 15201 / opencode 4096 冲突），路径 `/mcp`。
 
 ### 3. opencode-client.ts
-- 封装 fetch，统一处理 `OPENCODE_SERVER_PASSWORD`（HTTP Basic auth，用户名默认 `opencode`）。
+- 封装 fetch，统一处理 Basic auth（`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`）；所有请求带超时（默认 15s，可配 `timeoutMs`）。
 - 提供 `health / listSessions / getSession / getMessages / createSession / sendMessage / abort / find / shell` 方法，返回类型参考 opencode 的 OpenAPI（`/doc` 或 `@opencode-ai/sdk` 的 types）。
 
 ### 4. 会话续接（可选增强，涉及 bi-ji）
@@ -118,18 +120,18 @@ module.exports = {
 
 ## 实现清单（TODO，按序开工）
 
-- [ ] `pnpm init` 目录 + `package.json`（`@bi-ji/opencode-mcp`，dep: `@modelcontextprotocol/sdk`、`zod`；devDep: `tsx`、`typescript`、`@types/node`）
-- [ ] `tsconfig.json`（参考 `apps/server`：ES2022 / moduleResolution bundler / strict / noEmit + allowImportingTsExtensions）
-- [ ] `src/opencode-client.ts`：HTTP 封装 + 类型
-- [ ] `src/serve-manager.ts`：spawn/健康检查/重启/清理
-- [ ] `src/tools.ts`：注册全部工具
-- [ ] `src/index.ts`：入口接线（serve 托管 → MCP server 启动）
-- [ ] `.env.example`：`OPENCODE_URL` / `OPENCODE_PORT` / `OPENCODE_USERNAME` / `OPENCODE_PASSWORD` / `MCP_PORT`
-- [ ] `ecosystem.config.cjs`
-- [ ] 冒烟验证：`opencode serve` 起后被 mcp 连上；用 MCP 客户端（或 bi-ji 设置页工具预览）列出工具
+- [x] `pnpm init` 目录 + `package.json`（`@bi-ji/opencode-mcp`，dep: `@modelcontextprotocol/sdk`、`zod`；devDep: `tsx`、`typescript`、`@types/node`）
+- [x] `tsconfig.json`（参考 `apps/server`：ES2022 / moduleResolution bundler / strict / noEmit + allowImportingTsExtensions）
+- [x] `src/opencode-client.ts`：HTTP 封装 + 类型
+- [x] `src/serve-manager.ts`：spawn/健康检查/重启/清理
+- [x] `src/tools.ts`：注册全部工具
+- [x] `src/index.ts`：入口接线（serve 托管 → MCP server 启动）
+- [x] `.env.example`：`OPENCODE_URL` / `OPENCODE_PORT` / `OPENCODE_USERNAME` / `OPENCODE_PASSWORD` / `MCP_PORT`
+- [x] `ecosystem.config.cjs`
+- [x] 冒烟验证：`opencode serve` 起后被 mcp 连上；用 MCP 客户端（或 bi-ji 设置页工具预览）列出工具
 - [ ] 端到端：bi-ji 侧配置后 agent 调 `opencode_status` → `opencode_prompt` 完整走通
 - [ ] （可选增强）bi-ji 侧 `chat_threads.metadata.opencodeSessionId` 续接
-- [ ] 更新根 `FEATURES.md`：新增「OpenCode 集成」说明
+- [x] 更新根 `FEATURES.md`：新增「OpenCode 集成」说明
 
 ## 参考链接
 

@@ -93,6 +93,16 @@
 - Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效
 - MCP 服务器设置（`mcpServers`，JSON 数组）：通过 MCP 协议把外部服务器的工具挂载给主代理与调研子代理，用于扩展 Agent 能力；设置页以「列表 + 弹窗编辑」方式配置（不再手写 JSON），每行可开关启用（`enabled` 字段，未启用不挂载工具），下方「工具预览」连接各服务器列出其提供的工具；每项含 `name`（唯一标识，也是工具名前缀）、`type`（http/sse/stdio）、`url`（http/sse 用）、`headers`（http/sse 可选）、`command/args/env`（stdio 用）；加载的工具以 `mcp__{服务器名}__{工具名}` 命名避免与内置工具冲突，配置不变时结果按配置签名缓存复用（不重连），连接失败的服务器跳过并记录错误
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性；`POST /api/mcp/test` 试连所有配置的 MCP 服务器并列出其可用工具
+
+## OpenCode 集成（`apps/opencode-mcp`）
+
+- 独立子应用（`@bi-ji/opencode-mcp`，pnpm workspace 第三个包）：把常驻的 `opencode serve`（HTTP API）封装成标准 MCP 服务器，供 bi-ji 笔记 agent 通过 MCP http transport 调用，实现「在笔记对话里让 agent 驱动 opencode 做开发、查会话、续接对话」
+- 架构：`bi-ji server →(MCP http:9410)→ apps/opencode-mcp bridge →(http)→ opencode serve`；bridge 用 Hono + `@modelcontextprotocol/sdk` 的 `WebStandardStreamableHTTPServerTransport`（端点 `/mcp`），pm2 独立部署守护
+- 会话机制：opencode serve 常驻（由 bridge spawn + 守护，崩溃自动退避重启），session id 由 opencode 持久化，bridge 无状态转发；bi-ji 侧在设置页 MCP tab 配置 `{ "name": "opencode", "type": "http", "url": "http://127.0.0.1:9410/mcp" }` 即可，工具以 `mcp__opencode__opencode_*` 挂载
+- 工具集（围绕会话生命周期）：`opencode_status`（健康/版本）、`opencode_list_sessions`、`opencode_get_session`（详情+消息历史）、`opencode_prompt`（创建会话并发消息，返回 session id）、`opencode_continue`（按 session id 续接）、`opencode_abort`、`opencode_search`（跨文件搜索）、`opencode_run_shell`（在会话上下文执行 shell 命令）
+- 配置（`.env`，参考 `.env.example`）：`OPENCODE_URL`（外部 serve 地址，设置后不再 spawn）、`OPENCODE_PORT`/`OPENCODE_HOSTNAME`/`OPENCODE_PROJECT_DIR`（默认仓库根）、`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`（HTTP Basic auth，spawn 时透传给 serve）、`MCP_PORT`（默认 9410）
+- 请求统一带超时（默认 15s，健康检查 3s），避免 serve 初始化慢时 MCP 握手挂起
+- 测试：`tests/index.mts`（`pnpm --filter @bi-ji/opencode-mcp test`）起 bridge + spawn serve，用 `@ai-sdk/mcp` 客户端验证 8 个工具注册与 `opencode_status` 全链路
 - 数据库备份（`POST /api/backup/test`、`POST /api/backup/sync`）：支持两种备份类型，类型与连接信息存 `app_settings` 的 `backup*` 键
   - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
   - MySQL（`backupType=mysql`）：填 Host/Port/User/Password/数据库名（需预先建库）
