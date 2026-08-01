@@ -122,7 +122,7 @@ export function createNoteTools(
         query: z.string().describe('搜索关键词'),
         page: z.coerce.number().optional().describe('页码，从 1 开始'),
       }),
-      execute: async ({ query, page }) => toJsonSafe(searchNotes(query, page ?? 1)),
+      execute: async ({ query, page }) => toJsonSafe(await searchNotes(query, page ?? 1)),
     }),
 
     read_note: tool({
@@ -132,7 +132,7 @@ export function createNoteTools(
         startLine: z.coerce.number().optional().describe('起始行（含），默认 1'),
         endLine: z.coerce.number().optional().describe('结束行（含），默认到末尾'),
       }),
-      execute: async ({ noteId, startLine, endLine }) => toJsonSafe(readNote(noteId, startLine, endLine)),
+      execute: async ({ noteId, startLine, endLine }) => toJsonSafe(await readNote(noteId, startLine, endLine)),
     }),
 
     create_note: tool({
