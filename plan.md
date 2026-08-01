@@ -56,3 +56,36 @@ AI的所有变更，增加一个变更日志表，来专门存，后面可以进
 不自己用 Sequelize 去手写一套复杂的会话消息存储逻辑。
 
 初版基于行级 Diff（使用 diff 库），前端渲染成类似 GitHub PR 的 Hunk（代码块）视图，每个 Hunk 旁边有 "Accept" / "Reject" 按钮。这比基于 Markdown AST 的区块还原更容易实现且符合直觉。
+
+
+# 语音对话（定稿，待实现）
+
+## 目标
+- 语音输入：推按说话（按住录音、松开即发送），转文字后走现有 useChat 链路
+- AI 回复朗读：MessageList 每条 AI 消息加「朗读」按钮 + 自动朗读开关
+- 语音对话模式系统提示词：转写可能不准，指令含糊/关键词可疑（数字、专有名词、笔记名）时先追问澄清再行动；回复短句、口语化、易朗读
+
+## 技术选型（本地 CPU 优先）
+- ASR：Qwen3-ASR（0.6B / 1.7B），用社区 GGUF + llama.cpp 加速；i7 8 核跑 1.7B Q4（约 1GB）短句约 1~3s，0.6B 更快
+- 注意：Qwen3-ASR 只做识别不含 TTS（TTS 是 Qwen3-TTS，生成式 vocoder，CPU 慢）；朗读先用 piper（离线）/ edge-tts（在线免费、中文音质好），Qwen3-TTS 留待有 GPU 再上
+- 模型下载走 ModelScope（本机 HF 被墙），models/ 目录 .gitignore，不提交模型
+
+## 架构
+- apps/voice/：独立 Python 服务（FastAPI），绑 0.0.0.0 局域网可达，OpenAI 兼容接口
+  - POST /v1/audio/transcriptions — STT
+  - POST /v1/audio/speech — TTS（可后续接 piper / edge-tts / Qwen3-TTS）
+  - GET /health — 连通性探测
+  - 薄 package.json 包装 pnpm 脚本（download-model / start / dev，内部 spawn uvicorn），模式同 apps/opencode-mcp
+- bi-ji server：新增 /api/voice/transcribe 代理转发（浏览器只连 bi-ji，免 CORS；本机/局域网统一走设置里的 URL）
+- 设置页：新增「语音」分类，app_settings 存 voice* 键（voiceAsrUrl / voiceTtsUrl / 语言 / 自动朗读开关 / 推按松开发送 vs 先填入编辑 / 可选 Bearer token）；URL 为空则前端隐藏麦克风按钮，填了即启用
+- 前端：
+  - ChatInput 加麦克风按钮：onPointerDown 开始录音（MediaRecorder）、onPointerUp 停止并发送
+  - MessageList 加朗读按钮 + 自动朗读
+  - 语音消息带 inputMethod:'voice'，服务端据此注入语音模式系统提示词段落
+
+## 待办
+- [ ] apps/voice Python 服务骨架 + OpenAI 兼容 STT/TTS 接口 + /health
+- [ ] ModelScope 模型下载脚本 + models/ 进 .gitignore
+- [ ] bi-ji /api/voice/transcribe 代理 + 设置页「语音」配置（voice* 键）
+- [ ] ChatInput 推按说话 + MessageList 朗读按钮
+- [ ] agent 系统提示词注入语音对话模式
