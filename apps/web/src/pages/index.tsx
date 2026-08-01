@@ -7,7 +7,7 @@ import { Input } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { Empty } from '../ui/Empty'
 import { Loading } from '../ui/Loading'
-import { useDocTitle } from '../hooks/use-doc-title'
+import { SiteTitle } from '../ui/SiteTitle'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -67,8 +67,6 @@ export default function NotesPage() {
   const [tag, setTag] = useState('')
   const navigate = useNavigate()
 
-  useDocTitle('笔记')
-
   const UNTAGGED = '__untagged__'
 
   const tags = useMemo(() => {
@@ -108,6 +106,7 @@ export default function NotesPage() {
 
   return (
     <Page>
+      <SiteTitle title="笔记" />
       <CreateBar>
         <Input
           size="lg"

@@ -7,7 +7,7 @@ import { Button } from '../../ui/Button'
 import { Loading } from '../../ui/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
 import { TagInput } from '../../ui/TagInput'
-import { useDocTitle } from '../../hooks/use-doc-title'
+import { SiteTitle } from '../../ui/SiteTitle'
 import { MarkdownPreview } from '../../components/MarkdownPreview'
 
 const slideUp = keyframes`
@@ -116,8 +116,6 @@ export default function NoteEditorPage() {
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null)
   const [mode, setMode] = useState<'edit' | 'split' | 'preview'>('edit')
 
-  useDocTitle(note ? (title || '(无标题)') : null)
-
   useEffect(() => {
     setSlotEl(document.getElementById('topbar-slot'))
   }, [])
@@ -219,10 +217,16 @@ export default function NoteEditorPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [save])
 
-  if (!note) return <Loading />
+  if (!note) return (
+    <>
+      <SiteTitle title={null} />
+      <Loading />
+    </>
+  )
 
   return (
     <Wrap>
+      <SiteTitle title={`#${noteId} ${title || '(无标题)'}`} />
       {slotEl && createPortal(
         <>
           <div className="mode-group" role="group" aria-label="视图模式">

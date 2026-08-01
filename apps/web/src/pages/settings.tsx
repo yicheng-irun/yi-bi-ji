@@ -7,7 +7,7 @@ import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { Modal } from '../ui/Modal'
 import { Loading } from '../ui/Loading'
-import { useDocTitle } from '../hooks/use-doc-title'
+import { SiteTitle } from '../ui/SiteTitle'
 
 const Page = styled.div`
   max-width: 860px; margin: 0 auto;
@@ -295,8 +295,6 @@ function McpEditorModal({ server, existingNames, onSave, onClose }: {
 }
 
 export default function SettingsPage() {
-  useDocTitle('设置')
-
   const [params, setParams] = useSearchParams()
   const tab: TabKey = (params.get('tab') as TabKey) || 'ai'
 
@@ -480,6 +478,7 @@ export default function SettingsPage() {
 
   return (
     <Page>
+      <SiteTitle title="设置" />
       <Body>
         <Sidebar>
           {TABS.map((t) => (

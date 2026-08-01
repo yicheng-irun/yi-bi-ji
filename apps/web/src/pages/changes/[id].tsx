@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { api, type Hunk, type NoteDiff } from '../../api/client'
 import { Button } from '../../ui/Button'
 import { Loading } from '../../ui/Loading'
-import { useDocTitle } from '../../hooks/use-doc-title'
+import { SiteTitle } from '../../ui/SiteTitle'
 
 const Page = styled.div`
   max-width: 900px; margin: 0 auto;
@@ -111,7 +111,6 @@ export default function ChangeDetailPage() {
   const [diff, setDiff] = useState<NoteDiff | null>(null)
   const [error, setError] = useState('')
 
-  useDocTitle(diff ? `变更：${diff.draftTitle || '(无标题)'}` : null)
   const [accepted, setAccepted] = useState<boolean[]>([])
 
   useEffect(() => {
@@ -148,13 +147,20 @@ export default function ChangeDetailPage() {
     navigate('/changes')
   }
 
-  if (!diff) return error
-    ? <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>{error}</p>
-    : <Loading />
+  if (!diff) return (
+    <>
+      <SiteTitle title={null} />
+      {error
+        ? <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>{error}</p>
+        : <Loading />}
+    </>
+  )
 
+  const title = `变更：${diff.draftTitle || '(无标题)'}`
   if (diff.deletedAt) {
     return (
       <Page>
+        <SiteTitle title={title} />
         <TopBar>
           <Button variant="ghost" onClick={() => navigate('/changes')}>← 返回</Button>
           <h2 style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{diff.draftTitle || '(无标题)'}</h2>
@@ -172,6 +178,7 @@ export default function ChangeDetailPage() {
 
   return (
     <Page>
+      <SiteTitle title={title} />
       <TopBar>
         <Button variant="ghost" onClick={() => navigate('/changes')}>← 返回</Button>
         <h2>{diff.draftTitle || '(无标题)'}</h2>

@@ -7,7 +7,7 @@ import { Badge, type BadgeVariant } from '../ui/Badge'
 import { Empty } from '../ui/Empty'
 import { Select, type SelectOption } from '../ui/Select'
 import { Loading } from '../ui/Loading'
-import { useDocTitle } from '../hooks/use-doc-title'
+import { SiteTitle } from '../ui/SiteTitle'
 
 const Page = styled.div`
   max-width: 900px; margin: 0 auto;
@@ -89,8 +89,6 @@ const LineRow = styled.div<{ $kind: string }>`
 `
 
 export default function AiLogsPage() {
-  useDocTitle('AI 记录')
-
   const [notes, setNotes] = useState<Note[]>([])
   const [noteId, setNoteId] = useState('')
   const [action, setAction] = useState('')
@@ -189,6 +187,7 @@ export default function AiLogsPage() {
 
   return (
     <Page>
+      <SiteTitle title="AI 记录" />
       <Header>
         <h2>AI 修改记录</h2>
         {!loading && <span className="count">共 {total} 条</span>}

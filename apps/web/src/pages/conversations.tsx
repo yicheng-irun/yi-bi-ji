@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { Button } from '../ui/Button'
+import { SiteTitle } from '../ui/SiteTitle'
 import { ChatPanel } from '../components/ChatPanel'
 import { Loading } from '../ui/Loading'
-import { useDocTitle } from '../hooks/use-doc-title'
 
 const Wrap = styled.div`
   max-width: 1100px; margin: 0 auto;
@@ -61,8 +61,6 @@ export default function ConversationsPage() {
   const [error, setError] = useState('')
   const [activeId, setActiveId] = useState('')
 
-  useDocTitle('AI 会话')
-
   useEffect(() => {
     api.listThreads().then((res) => {
       const list = res.threads
@@ -89,6 +87,7 @@ export default function ConversationsPage() {
 
   return (
     <Wrap>
+      <SiteTitle title="AI 会话" />
       <ThreadList>
         <Button className="new-thread" onClick={() => setActiveId('')}>+ 新建全局对话</Button>
 

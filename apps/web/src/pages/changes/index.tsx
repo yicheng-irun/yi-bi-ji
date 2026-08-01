@@ -6,7 +6,7 @@ import { Button } from '../../ui/Button'
 import { Badge } from '../../ui/Badge'
 import { Empty } from '../../ui/Empty'
 import { Loading } from '../../ui/Loading'
-import { useDocTitle } from '../../hooks/use-doc-title'
+import { SiteTitle } from '../../ui/SiteTitle'
 
 const Page = styled.div`
   max-width: 760px; margin: 0 auto;
@@ -45,8 +45,6 @@ export default function ChangesPage() {  const [changes, setChanges] = useState<
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  useDocTitle('变更')
-
   useEffect(() => {
     api.listChanges()
       .then(setChanges)
@@ -64,6 +62,7 @@ export default function ChangesPage() {  const [changes, setChanges] = useState<
 
   return (
     <Page>
+      <SiteTitle title="变更" />
       <Header>
         <h2>未提交的变更</h2>
         {!loading && <span className="count">{changes.length} 篇</span>}
