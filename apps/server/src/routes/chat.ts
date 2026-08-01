@@ -76,7 +76,7 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
   const knownIds = new Set(history.map((m) => m.id))
   const uiMessages = [...history, newMessage]
 
-  const agent = createNoteAgent(threadId)
+  const agent = await createNoteAgent(threadId)
   type AgentUIMessage = InferAgentUIMessage<typeof agent>
 
   return createAgentUIStreamResponse({

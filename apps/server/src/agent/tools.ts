@@ -4,9 +4,7 @@ import { ChatThread } from '../db/models.js'
 import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
 import { persistMessages } from '../services/chat.js'
 import { createWebTools } from './web-tools.js'
-import { createResearchSubagent } from './subagents.js'
-
-/** 主代理全部可用工具（含联网与深度调研） */
+import { createResearchSubagent } from './subagents.js'/** 主代理全部可用工具（含联网与深度调研） */
 export const MAIN_AGENT_TOOLS = [
   'web_search', 'web_fetch', 'deep_research',
   'list_notes', 'search_notes', 'read_note', 'create_note', 'set_note_tags',
@@ -29,7 +27,12 @@ function pickTools<T extends Record<string, unknown>>(all: T, enabled: Set<strin
   return Object.fromEntries(Object.entries(all).filter(([name]) => enabled.has(name))) as T
 }
 
-export function createNoteTools(threadId: string, enabledTools: Set<string> | null = null, subagentEnabledTools: Set<string> | null = null) {
+export function createNoteTools(
+  threadId: string,
+  enabledTools: Set<string> | null = null,
+  subagentEnabledTools: Set<string> | null = null,
+  mcpTools: ToolSet = {},
+) {
   const tools = {
     ...createWebTools(),
 
@@ -52,7 +55,7 @@ export function createNoteTools(threadId: string, enabledTools: Set<string> | nu
           }),
         })
 
-        const { deep_research: _exclude, ...subagentTools } = createNoteTools(subThreadId, subagentEnabledTools)
+        const { deep_research: _exclude, ...subagentTools } = createNoteTools(subThreadId, subagentEnabledTools, null, mcpTools)
         const subagent = createResearchSubagent(subagentTools)
         const result = await subagent.stream({ prompt: task, abortSignal })
 
@@ -205,7 +208,7 @@ export function createNoteTools(threadId: string, enabledTools: Set<string> | nu
     }),
   }
 
-  return pickTools(tools, enabledTools)
+  return { ...pickTools(tools, enabledTools), ...mcpTools }
 }
 
 export type NoteTools = ReturnType<typeof createNoteTools>

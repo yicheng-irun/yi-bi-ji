@@ -7,9 +7,10 @@
     "start": "tsx src/index.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/smoke.mts"
+    "test": "tsx tests/index.mts"
   },
   "dependencies": {
+    "@ai-sdk/mcp": "^2.0.20",
     "@ai-sdk/openai-compatible": "latest",
     "@hono/node-server": "latest",
     "@mozilla/readability": "^0.6.0",
@@ -28,6 +29,7 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/diff": "latest",
     "@types/node": "latest",
     "@types/turndown": "^5.0.6",

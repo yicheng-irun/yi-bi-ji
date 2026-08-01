@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, AGENT_TOOLS, ALL_TOOLS_SENTINEL, SUBAGENT_TOOLS, type AgentToolInfo, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
+import { api, AGENT_TOOLS, ALL_TOOLS_SENTINEL, SUBAGENT_TOOLS, type AgentToolInfo, type McpServerDraft, type McpTestResult, parseMcpServers, serializeMcpServers, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
+import { Modal } from '../ui/Modal'
 import { Loading } from '../ui/Loading'
 import { useDocTitle } from '../hooks/use-doc-title'
 
@@ -72,6 +73,63 @@ const CountGrid = styled.div`
   }
 `
 
+const JsonEditor = styled.textarea`
+  width: 100%; min-height: 260px; resize: vertical;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
+  padding: 12px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text); outline: none;
+  &:focus { border-color: var(--accent); }
+`
+
+const McpList = styled.div`
+  display: flex; flex-direction: column; gap: 8px;
+`
+
+const McpRow = styled.div<{ $enabled: boolean }>`
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 14px; background: var(--bg-card);
+  opacity: ${(p) => (p.$enabled ? 1 : .6)};
+  transition: opacity .15s, border-color .15s;
+  &:hover { border-color: var(--accent); }
+  .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .name { font-size: 13px; font-weight: 600; }
+  .meta { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badges { display: flex; gap: 6px; flex-shrink: 0; }
+`
+
+const Toggle = styled.button<{ $on: boolean }>`
+  width: 38px; height: 21px; border-radius: 11px; border: none; cursor: pointer;
+  position: relative; flex-shrink: 0; padding: 0;
+  background: ${(p) => (p.$on ? 'var(--green)' : 'var(--border)')};
+  transition: background .15s;
+  &::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 17px; height: 17px; border-radius: 50%; background: #fff;
+    transform: translateX(${(p) => (p.$on ? '17px' : '0')});
+    transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+`
+
+const McpServers = styled.div`
+  display: flex; flex-direction: column; gap: 12px;
+  .server {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px; background: var(--bg-card);
+  }
+  .server-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .server-name { font-size: 13px; font-weight: 600; }
+  .server-error { font-size: 12px; color: var(--red); word-break: break-all; }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tool-chip {
+    font-size: 12px; padding: 3px 9px; border-radius: 6px;
+    background: var(--bg-hover); border: 1px solid var(--border);
+    font-family: var(--font-mono);
+  }
+`
+
 const ToolGrid = styled.div`
   display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px;
 `
@@ -96,6 +154,7 @@ const ToolGridHeader = styled.div`
 const TABS = [
   { key: 'ai', label: '大模型', icon: '🤖' },
   { key: 'agent', label: 'Agent 能力', icon: '🧩' },
+  { key: 'mcp', label: 'MCP 服务器', icon: '🔌' },
   { key: 'backup', label: '数据备份', icon: '💾' },
 ] as const
 
@@ -104,11 +163,135 @@ const BACKUP_TYPE_OPTIONS = [
   { value: 'mysql', label: 'MySQL' },
 ]
 
+const MCP_TYPE_OPTIONS = [
+  { value: 'http', label: 'http（推荐）' },
+  { value: 'sse', label: 'sse' },
+  { value: 'stdio', label: 'stdio' },
+]
+
 type TabKey = typeof TABS[number]['key']
 
 interface Status {
   ok: boolean
   text: string
+}
+
+function emptyMcpServer(): McpServerDraft {
+  return { name: '', type: 'http', url: '', enabled: true }
+}
+
+function McpEditorModal({ server, existingNames, onSave, onClose }: {
+  server: McpServerDraft
+  existingNames: string[]
+  onSave: (s: McpServerDraft) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState<McpServerDraft>(server)
+  const [error, setError] = useState('')
+
+  const set = <K extends keyof McpServerDraft>(key: K, value: McpServerDraft[K]) =>
+    setForm((f) => ({ ...f, [key]: value }))
+
+  const save = () => {
+    const name = form.name.trim()
+    if (!name) {
+      setError('请填写服务器名称')
+      return
+    }
+    if (existingNames.includes(name) && name !== server.name) {
+      setError('该名称已存在')
+      return
+    }
+    onSave({ ...form, name })
+  }
+
+  return (
+    <Modal
+      title={server.name ? `编辑 MCP 服务器：${server.name}` : '新增 MCP 服务器'}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>取消</Button>
+          <Button variant="primary" onClick={save}>保存</Button>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field>
+          <label>名称（唯一标识，也是工具名前缀）</label>
+          <Input value={form.name} placeholder="如 filesystem / docs" onChange={(e) => set('name', e.target.value)} />
+        </Field>
+        <Field>
+          <label>类型</label>
+          <div className="select-row">
+            <Select value={form.type} onChange={(v) => set('type', v as McpServerDraft['type'])} options={MCP_TYPE_OPTIONS} />
+          </div>
+        </Field>
+
+        {(form.type === 'http' || form.type === 'sse') && (
+          <>
+            <Field>
+              <label>URL</label>
+              <Input value={form.url ?? ''} placeholder="https://example.com/mcp" onChange={(e) => set('url', e.target.value)} />
+            </Field>
+            <Field>
+              <label>请求头 headers（JSON 对象，可选）</label>
+              <JsonEditor
+                value={form.headers ? JSON.stringify(form.headers, null, 2) : ''}
+                placeholder='{ "Authorization": "Bearer xxx" }'
+                style={{ minHeight: 90 }}
+                spellCheck={false}
+                onChange={(e) => {
+                  const v = e.target.value.trim()
+                  if (!v) { set('headers', undefined); return }
+                  try { set('headers', JSON.parse(v)) } catch { /* 暂存非法值给用户继续编辑 */ }
+                }}
+              />
+            </Field>
+          </>
+        )}
+
+        {form.type === 'stdio' && (
+          <>
+            <Field>
+              <label>启动命令 command</label>
+              <Input value={form.command ?? ''} placeholder="npx / node / python" onChange={(e) => set('command', e.target.value)} />
+            </Field>
+            <Field>
+              <label>启动参数 args（JSON 数组，可选）</label>
+              <JsonEditor
+                value={form.args ? JSON.stringify(form.args, null, 2) : ''}
+                placeholder='["-y", "@modelcontextprotocol/server-filesystem", "/path"]'
+                style={{ minHeight: 70 }}
+                spellCheck={false}
+                onChange={(e) => {
+                  const v = e.target.value.trim()
+                  if (!v) { set('args', undefined); return }
+                  try { set('args', JSON.parse(v)) } catch { /* 暂存 */ }
+                }}
+              />
+            </Field>
+            <Field>
+              <label>环境变量 env（JSON 对象，可选）</label>
+              <JsonEditor
+                value={form.env ? JSON.stringify(form.env, null, 2) : ''}
+                placeholder='{ "API_KEY": "xxx" }'
+                style={{ minHeight: 70 }}
+                spellCheck={false}
+                onChange={(e) => {
+                  const v = e.target.value.trim()
+                  if (!v) { set('env', undefined); return }
+                  try { set('env', JSON.parse(v)) } catch { /* 暂存 */ }
+                }}
+              />
+            </Field>
+          </>
+        )}
+
+        {error && <div style={{ color: 'var(--red)', fontSize: 12.5 }}>{error}</div>}
+      </div>
+    </Modal>
+  )
 }
 
 export default function SettingsPage() {
@@ -122,6 +305,8 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<Status | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [lastCounts, setLastCounts] = useState<Record<string, number> | null>(null)
+  const [mcpTest, setMcpTest] = useState<McpTestResult | null>(null)
+  const [mcpEditor, setMcpEditor] = useState<{ index: number; server: McpServerDraft } | null>(null)
 
   useEffect(() => {
     api.getSettings().then(setForm).catch((e) => {
@@ -192,6 +377,52 @@ export default function SettingsPage() {
     } finally {
       setBusy(null)
     }
+  }
+
+  const testMcp = async () => {
+    setStatus(null)
+    setBusy('test-mcp')
+    setMcpTest(null)
+    try {
+      const r = await api.testMcp(form.mcpServers)
+      setMcpTest(r)
+      const failed = r.servers.filter((s) => s.error)
+      setStatus(
+        r.ok
+          ? { ok: true, text: failed.length ? '部分服务器连接失败' : '连接成功' }
+          : { ok: false, text: failed.map((s) => `${s.name}: ${s.error}`).join('；') || '连接失败' },
+      )
+    } catch (e) {
+      setStatus({ ok: false, text: (e as Error).message || '测试失败' })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const mcpServers = parseMcpServers(form.mcpServers)
+
+  const setMcpServers = (servers: McpServerDraft[]) => {
+    set('mcpServers', serializeMcpServers(servers))
+  }
+
+  const toggleMcp = (index: number) => {
+    const next = mcpServers.map((s, i) => (i === index ? { ...s, enabled: s.enabled !== false ? false : true } : s))
+    setMcpServers(next)
+  }
+
+  const removeMcp = (index: number) => {
+    if (!confirm('删除该 MCP 服务器？')) return
+    setMcpServers(mcpServers.filter((_, i) => i !== index))
+  }
+
+  const saveMcpEditor = (server: McpServerDraft) => {
+    if (mcpEditor) {
+      const next = [...mcpServers]
+      if (mcpEditor.index === -1) next.push(server)
+      else next[mcpEditor.index] = server
+      setMcpServers(next)
+    }
+    setMcpEditor(null)
   }
 
   const selectedToolSet = (raw: string, all: AgentToolInfo[]) =>
@@ -310,6 +541,95 @@ export default function SettingsPage() {
                 '调研子代理可用工具',
                 '深度调研子代理可调用的工具（不含 deep_research 本身），默认全部勾选。',
                 SUBAGENT_TOOLS,
+              )}
+            </>
+          )}
+
+          {tab === 'mcp' && (
+            <>
+              <Card>
+                <h3>MCP 服务器</h3>
+                <div className="hint">
+                  通过 MCP（Model Context Protocol）扩展 Agent 能力：把外部 MCP 服务器的工具挂载给主代理和调研子代理。
+                  可新增/编辑服务器，每行可开关启用；下方可预览每个服务器提供的工具。保存后新对话生效。
+                </div>
+                {mcpServers.length === 0 ? (
+                  <div className="hint" style={{ padding: '12px 0' }}>尚未配置任何 MCP 服务器</div>
+                ) : (
+                  <McpList>
+                    {mcpServers.map((s, i) => (
+                      <McpRow key={`${s.name}-${i}`} $enabled={s.enabled !== false}>
+                        <Toggle
+                          $on={s.enabled !== false}
+                          title={s.enabled !== false ? '已启用' : '已停用'}
+                          onClick={() => toggleMcp(i)}
+                        />
+                        <span className="info">
+                          <span className="name">{s.name}</span>
+                          <span className="meta">
+                            {s.type} · {s.type === 'stdio' ? s.command ?? '-' : s.url ?? '-'}
+                          </span>
+                        </span>
+                        <span className="badges">
+                          <Button size="sm" onClick={() => setMcpEditor({ index: i, server: s })}>编辑</Button>
+                          <Button size="sm" variant="danger" onClick={() => removeMcp(i)}>删除</Button>
+                        </span>
+                      </McpRow>
+                    ))}
+                  </McpList>
+                )}
+                <Actions>
+                  <Button variant="primary" onClick={() => setMcpEditor({ index: -1, server: emptyMcpServer() })}>
+                    ＋ 新增服务器
+                  </Button>
+                  <Button variant="success" onClick={() => void save()} disabled={saving}>
+                    {saving ? '保存中…' : '保存配置'}
+                  </Button>
+                  {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
+                </Actions>
+              </Card>
+
+              <Card>
+                <ToolGridHeader>
+                  <h3>工具预览</h3>
+                  <button className="toggle-all" onClick={() => void testMcp()}>
+                    {busy === 'test-mcp' ? '连接中…' : '刷新预览'}
+                  </button>
+                </ToolGridHeader>
+                <div className="hint">
+                  连接到各 MCP 服务器并列出其提供的工具（未启用的服务器也会显示，方便预览后再开启）。点击「刷新预览」更新。
+                </div>
+                {!mcpTest ? (
+                  <div className="hint" style={{ padding: '12px 0' }}>尚未预览，点击右上角「刷新预览」查看各服务器提供的工具。</div>
+                ) : mcpTest.servers.length === 0 ? (
+                  <div className="hint" style={{ padding: '12px 0' }}>没有可预览的服务器。</div>
+                ) : (
+                  <McpServers>
+                    {mcpTest.servers.map((s) => (
+                      <div className="server" key={s.name}>
+                        <div className="server-head">
+                          <span className="server-name">{s.name}</span>
+                          <span className="hint">{s.tools.length} 个工具</span>
+                        </div>
+                        {s.error && <div className="server-error">{s.error}</div>}
+                        <div className="tools">
+                          {s.tools.map((t) => (
+                            <span className="tool-chip" key={t.key} title={t.description || t.name}>{t.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </McpServers>
+                )}
+              </Card>
+
+              {mcpEditor && (
+                <McpEditorModal
+                  server={mcpEditor.server}
+                  existingNames={mcpServers.map((s) => s.name)}
+                  onClose={() => setMcpEditor(null)}
+                  onSave={(s) => saveMcpEditor(s)}
+                />
               )}
             </>
           )}

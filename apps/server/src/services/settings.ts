@@ -10,6 +10,8 @@ export interface Settings {
   aiTools: string
   /** 调研子代理可用工具，逗号分隔；'*' 或不配置 = 全部可用 */
   aiSubagentTools: string
+  /** MCP 服务器配置 JSON（数组），用于扩展 agent 工具能力 */
+  mcpServers: string
   backupType: string
   backupPath: string
   backupHost: string
@@ -34,6 +36,7 @@ export function getSettings(): Settings {
     reasoningEffort: cache.reasoningEffort ?? '',
     aiTools: cache.aiTools ?? '*',
     aiSubagentTools: cache.aiSubagentTools ?? '*',
+    mcpServers: cache.mcpServers ?? '',
     backupType: cache.backupType ?? 'sqlite',
     backupPath: cache.backupPath ?? '',
     backupHost: cache.backupHost ?? '',

@@ -10,6 +10,7 @@ import { eventsRoutes } from './routes/events.js'
 import { aiLogsRoutes } from './routes/ai-logs.js'
 import { settingsRoutes } from './routes/settings.js'
 import { backupRoutes } from './routes/backup.js'
+import { mcpRoutes } from './routes/mcp.js'
 import { closeBrowser } from './services/browser.js'
 import { initSettingsCache } from './services/settings.js'
 
@@ -29,6 +30,7 @@ app.route('/api/events', eventsRoutes)
 app.route('/api/ai-logs', aiLogsRoutes)
 app.route('/api/settings', settingsRoutes)
 app.route('/api/backup', backupRoutes)
+app.route('/api/mcp', mcpRoutes)
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`)

@@ -11,7 +11,7 @@ settingsRoutes.put('/', async (c) => {
   const body = await c.req.json<Partial<Settings>>()
   const clean: Record<string, string> = {}
   const keys: (keyof Settings)[] = [
-    'aiBaseURL', 'aiApiKey', 'aiModel', 'reasoningEffort', 'aiTools', 'aiSubagentTools',
+    'aiBaseURL', 'aiApiKey', 'aiModel', 'reasoningEffort', 'aiTools', 'aiSubagentTools', 'mcpServers',
     'backupType', 'backupPath', 'backupHost', 'backupPort', 'backupUser', 'backupPassword', 'backupDatabase',
   ]
   for (const key of keys) {

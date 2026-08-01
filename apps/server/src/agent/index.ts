@@ -2,9 +2,12 @@ import { ToolLoopAgent, isStepCount } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { getSettings } from '../services/settings.js'
 import { createNoteTools, parseEnabledTools } from './tools.js'
+import { loadMcpToolsCached, parseMcpServers } from './mcp.js'
 
-export function createNoteAgent(threadId: string) {
+export async function createNoteAgent(threadId: string) {
   const s = getSettings()
+  const enabledMcp = parseMcpServers(s.mcpServers).filter((sv) => sv.enabled !== false)
+  const mcp = await loadMcpToolsCached(enabledMcp)
   const provider = createOpenAICompatible({
     name: 'custom',
     baseURL: s.aiBaseURL,
@@ -27,6 +30,7 @@ export function createNoteAgent(threadId: string) {
 - set_note_tags：设置笔记的标签。创建或整理笔记时，根据内容主动打标签归类（如每日资讯、随想、稿子、计划、方法论、提示词等），先复用已有标签名，保持命名简洁一致
 - web_search / web_fetch：联网搜索和读取网页全文（找资料、看新闻）。web_fetch 返回 Markdown（含链接和图片地址），需要引用时把链接原样保留进笔记；返回长文时用 start 翻页读取；如果触发真人验证或超时，如实告知用户。
 - deep_research：需要翻阅大量网页、深度对比资料的复杂调研任务，派给联网研究子代理去做（它会自主搜索、读文并返回带来源链接的报告），避免占用你太多上下文；执行过程中你不需要等它的每一步，只需在它返回报告后据此回复。
+- mcp__*：通过 MCP 服务器挂载的外部工具，按需使用即可，用法与其他工具一致。
 
 重要规则：
 1. 你的所有修改只写入「草稿」，用户确认后才会正式落库，所以可以放心修改，但要说明你改了什么。
@@ -39,6 +43,7 @@ export function createNoteAgent(threadId: string) {
       threadId,
       parseEnabledTools(s.aiTools),
       parseEnabledTools(s.aiSubagentTools),
+      mcp.tools,
     ),
     stopWhen: isStepCount(50),
   })

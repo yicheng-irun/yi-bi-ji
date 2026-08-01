@@ -155,6 +155,51 @@ export const api = {
     request<{ ok: boolean; error?: string }>('/api/backup/test', { method: 'POST', body: '{}' }),
   syncBackup: () =>
     request<{ ok: boolean; counts?: Record<string, number>; error?: string }>('/api/backup/sync', { method: 'POST', body: '{}' }),
+  testMcp: (mcpServers: string) =>
+    request<McpTestResult>('/api/mcp/test', { method: 'POST', body: JSON.stringify({ mcpServers }) }),
+}
+
+export interface McpToolInfo {
+  key: string
+  name: string
+  description?: string
+}
+
+/** MCP 服务器配置（设置页编辑/预览用，与后端 McpServerConfig 一致） */
+export interface McpServerDraft {
+  name: string
+  type: 'http' | 'sse' | 'stdio'
+  url?: string
+  headers?: Record<string, string>
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  enabled?: boolean
+}
+
+export function parseMcpServers(raw: string): McpServerDraft[] {
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((s): s is McpServerDraft => !!s && typeof s === 'object' && typeof s.name === 'string')
+  } catch {
+    return []
+  }
+}
+
+export function serializeMcpServers(servers: McpServerDraft[]): string {
+  return JSON.stringify(servers, null, 2)
+}
+
+export interface McpServerResult {
+  name: string
+  error: string | null
+  tools: McpToolInfo[]
+}
+
+export interface McpTestResult {
+  ok: boolean
+  servers: McpServerResult[]
 }
 
 export interface Settings {
@@ -164,6 +209,7 @@ export interface Settings {
   reasoningEffort: string
   aiTools: string
   aiSubagentTools: string
+  mcpServers: string
   backupType: string
   backupPath: string
   backupHost: string
