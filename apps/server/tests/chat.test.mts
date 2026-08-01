@@ -23,7 +23,7 @@ export async function runChatTests() {
   const res = await fetch(`${BASE}/api/chat/threads/${tid}/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: '用 read_note 读一下当前笔记，然后回复我一个字：好', currentNoteId: nid }),
+    body: JSON.stringify({ message: '用 read_note 读一下当前笔记，然后回复我一个字：好' }),
   })
   const text = await res.text()
   for (const line of text.split('\n')) {

@@ -1,5 +1,7 @@
 import { ToolLoopAgent, isStepCount } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { ChatThread } from '../db/models.js'
+import { parseThreadMetadata } from '../services/chat.js'
 import { getSettings } from '../services/settings.js'
 import { createNoteTools, parseEnabledTools } from './tools.js'
 import { loadMcpToolsCached, parseMcpServers } from './mcp.js'
@@ -8,6 +10,12 @@ export async function createNoteAgent(threadId: string) {
   const s = getSettings()
   const enabledMcp = parseMcpServers(s.mcpServers).filter((sv) => sv.enabled !== false)
   const mcp = await loadMcpToolsCached(enabledMcp)
+  const thread = await ChatThread.findByPk(threadId)
+  const originNoteId = thread ? parseThreadMetadata(thread).originNoteId : undefined
+  const noteContext =
+    typeof originNoteId === 'number'
+      ? `当前对话与笔记 id=${originNoteId} 关联（用户是在这篇笔记的上下文里开启的对话），优先基于它工作。`
+      : '当前是全局对话，没有固定关联的笔记，按用户提问自行查找相关笔记。'
   const provider = createOpenAICompatible({
     name: 'custom',
     baseURL: s.aiBaseURL,
@@ -37,7 +45,7 @@ export async function createNoteAgent(threadId: string) {
 2. 修改前先读取目标笔记的最新内容（用户可能刚改过）。
 3. replace_in_note 失败时，按工具返回的原因，先用 read_note 重读再重试。
 4. 不要一次性把所有笔记塞入上下文；先搜索/列表，再按需读取。
-5. 用户当前正在查看的笔记 id 可能会在对话中提供，优先基于它工作。
+5. ${noteContext}
 6. 用中文回复，保持简洁。`,
     tools: createNoteTools(
       threadId,

@@ -31,7 +31,7 @@
 
 ## AI 助手
 
-- 右侧侧边栏，与当前正在编辑的笔记联动（告知 AI 当前笔记 id）
+- 右侧侧边栏，与当前正在编辑的笔记联动；会话按创建时的笔记关联（`originNoteId`），该笔记 id 通过系统提示注入 Agent，全局对话则无固定关联笔记
 - 对话支持多线程，在 `/conversations` 页面可审计历史会话
 - AI SDK v7 `ToolLoopAgent`（OpenAI 兼容端点），提供以下工具：
   - `list_notes` — 列出所有笔记

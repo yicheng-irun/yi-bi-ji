@@ -39,7 +39,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
             api: `/api/chat/threads/${tid}/stream`,
             headers,
             credentials,
-            body: { messages: messages.slice(-1), currentNoteId: noteIdRef.current },
+            body: { messages: messages.slice(-1) },
           }
         },
       }),

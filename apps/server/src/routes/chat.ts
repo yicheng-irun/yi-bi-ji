@@ -48,8 +48,8 @@ chatRoutes.get('/threads/:id/messages', async (c) => {
 chatRoutes.post('/threads/:id/stream', async (c) => {
   const threadId = c.req.param('id')
   const body = await c.req
-    .json<{ message?: string; messages?: UIMessage[]; currentNoteId?: number }>()
-    .catch(() => ({}) as { message?: string; messages?: UIMessage[]; currentNoteId?: number })
+    .json<{ message?: string; messages?: UIMessage[] }>()
+    .catch(() => ({}) as { message?: string; messages?: UIMessage[] })
 
   let thread = await ChatThread.findByPk(threadId)
   if (!thread) {
@@ -63,14 +63,6 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
     newMessage = { id: crypto.randomUUID(), role: 'user', parts: [{ type: 'text', text: body.message }] }
   }
   if (!newMessage) return c.json({ error: 'message is required' }, 400)
-
-  if (body.currentNoteId && newMessage.role === 'user') {
-    for (const part of newMessage.parts) {
-      if (part.type === 'text' && !part.text.startsWith('[用户当前正在查看笔记')) {
-        part.text = `[用户当前正在查看笔记 id=${body.currentNoteId}]\n\n${part.text}`
-      }
-    }
-  }
 
   const history = (await loadHistory(threadId)).slice(-MAX_CONTEXT_MESSAGES)
   const knownIds = new Set(history.map((m) => m.id))
