@@ -16,7 +16,7 @@ pnpm install            # 安装依赖
 pnpm dev                # 并行启动 server + web
 pnpm -r run typecheck   # 类型检查（改完代码必须跑）
 pnpm -r run build       # 构建
-pnpm test               # smoke 测试（apps/server/scripts/smoke.mts，自起服务+临时库，端口 15311）
+pnpm test               # 端到端测试（apps/server/tests/，自起服务+临时库，端口 15311；index.mts 汇总，各功能一个 .test.mts）
 ```
 
 ## 配置
