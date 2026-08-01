@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
 import { ChatPanel } from './ChatPanel'
-import { Select } from './Select'
+import { Select } from '../ui/Select'
 
 const DEFAULT_WIDTH = 600
 const MIN_WIDTH = 320

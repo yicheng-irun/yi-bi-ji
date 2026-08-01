@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Hunk, type NoteDiff } from '../../api/client'
-import { Loading } from '../../components/Loading'
+import { Button } from '../../ui/Button'
+import { Loading } from '../../ui/Loading'
 import { useDocTitle } from '../../hooks/use-doc-title'
 
 const Page = styled.div`
@@ -155,11 +156,11 @@ export default function ChangeDetailPage() {
     return (
       <Page>
         <TopBar>
-          <button onClick={() => navigate('/changes')} style={{ border: 'none', padding: '6px 8px', background: 'transparent' }}>← 返回</button>
+          <Button variant="ghost" onClick={() => navigate('/changes')}>← 返回</Button>
           <h2 style={{ textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{diff.draftTitle || '(无标题)'}</h2>
           <div className="spacer" />
-          <button onClick={undoDelete}>撤销删除</button>
-          <button className="btn-danger" onClick={confirmDelete}>确认删除</button>
+          <Button onClick={undoDelete}>撤销删除</Button>
+          <Button variant="danger" onClick={confirmDelete}>确认删除</Button>
         </TopBar>
         <DeleteBanner>
           <span>🗑 该笔记已标记为待删除（{new Date(diff.deletedAt).toLocaleString('zh-CN')}）。点击「确认删除」将永久删除，或「撤销删除」恢复。</span>
@@ -172,13 +173,13 @@ export default function ChangeDetailPage() {
   return (
     <Page>
       <TopBar>
-        <button onClick={() => navigate('/changes')} style={{ border: 'none', padding: '6px 8px', background: 'transparent' }}>← 返回</button>
+        <Button variant="ghost" onClick={() => navigate('/changes')}>← 返回</Button>
         <h2>{diff.draftTitle || '(无标题)'}</h2>
         <div className="spacer" />
-        <button onClick={discardAll}>放弃全部</button>
-        <button className="btn-green" onClick={commit}>
+        <Button onClick={discardAll}>放弃全部</Button>
+        <Button variant="success" onClick={commit}>
           提交（{accepted.filter(Boolean).length}/{diff.hunks.length}）
-        </button>
+        </Button>
       </TopBar>
 
       {diff.draftTitle !== diff.committedTitle && (

@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { NavLink, useRoutes } from 'react-router-dom'
 import routes from '~react-pages'
 import { Layout, Main, TopBar } from './styles'
-import { Loading } from './components/Loading'
+import { Loading } from './ui/Loading'
 
 export default function App() {
   return (

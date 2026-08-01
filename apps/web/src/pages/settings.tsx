@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Settings, REASONING_EFFORT_OPTIONS } from '../api/client'
-import { Select } from '../components/Select'
-import { Loading } from '../components/Loading'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { Select } from '../ui/Select'
+import { Loading } from '../ui/Loading'
 import { useDocTitle } from '../hooks/use-doc-title'
 
 const Page = styled.div`
@@ -46,10 +48,6 @@ const Card = styled.div`
 const Field = styled.div`
   display: flex; flex-direction: column; gap: 6px;
   label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-  input {
-    height: 36px; font-size: 13px; padding: 0 12px;
-    background: var(--bg-card); color: var(--text);
-  }
   .select-row { display: flex; align-items: center; gap: 10px; }
   .select-row > div { flex: initial; width: 180px; }
 `
@@ -197,15 +195,15 @@ export default function SettingsPage() {
               <div className="hint">这里的配置会覆盖 .env 里的默认值，保存后对新的对话立即生效。</div>
               <Field>
                 <label>Base URL</label>
-                <input value={form.aiBaseURL} placeholder="https://api.openai.com/v1" onChange={(e) => set('aiBaseURL', e.target.value)} />
+                <Input value={form.aiBaseURL} placeholder="https://api.openai.com/v1" onChange={(e) => set('aiBaseURL', e.target.value)} />
               </Field>
               <Field>
                 <label>API Key</label>
-                <input type="password" value={form.aiApiKey} placeholder="sk-..." onChange={(e) => set('aiApiKey', e.target.value)} />
+                <Input type="password" value={form.aiApiKey} placeholder="sk-..." onChange={(e) => set('aiApiKey', e.target.value)} />
               </Field>
               <Field>
                 <label>模型</label>
-                <input value={form.aiModel} placeholder="gpt-4o-mini" onChange={(e) => set('aiModel', e.target.value)} />
+                <Input value={form.aiModel} placeholder="gpt-4o-mini" onChange={(e) => set('aiModel', e.target.value)} />
               </Field>
               <Field>
                 <label>思考强度</label>
@@ -215,10 +213,10 @@ export default function SettingsPage() {
                 </div>
               </Field>
               <Actions>
-                <button className="btn-primary" onClick={() => void save()} disabled={saving}>
+                <Button variant="primary" onClick={() => void save()} disabled={saving}>
                   {saving ? '保存中…' : '保存'}
-                </button>
-                <button onClick={() => void testAi()}>测试连接</button>
+                </Button>
+                <Button onClick={() => void testAi()}>测试连接</Button>
                 {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
               </Actions>
             </Card>
@@ -239,46 +237,46 @@ export default function SettingsPage() {
               {form.backupType === 'sqlite' ? (
                 <Field>
                   <label>备份文件路径</label>
-                  <input value={form.backupPath} placeholder="data/backup.db" onChange={(e) => set('backupPath', e.target.value)} />
+                  <Input value={form.backupPath} placeholder="data/backup.db" onChange={(e) => set('backupPath', e.target.value)} />
                 </Field>
               ) : (
                 <>
                   <FieldRow>
                     <Field>
                       <label>Host</label>
-                      <input value={form.backupHost} placeholder="127.0.0.1" onChange={(e) => set('backupHost', e.target.value)} />
+                      <Input value={form.backupHost} placeholder="127.0.0.1" onChange={(e) => set('backupHost', e.target.value)} />
                     </Field>
                     <Field>
                       <label>Port</label>
-                      <input value={form.backupPort} placeholder="3306" onChange={(e) => set('backupPort', e.target.value)} />
+                      <Input value={form.backupPort} placeholder="3306" onChange={(e) => set('backupPort', e.target.value)} />
                     </Field>
                   </FieldRow>
                   <FieldRow>
                     <Field>
                       <label>User</label>
-                      <input value={form.backupUser} placeholder="root" onChange={(e) => set('backupUser', e.target.value)} />
+                      <Input value={form.backupUser} placeholder="root" onChange={(e) => set('backupUser', e.target.value)} />
                     </Field>
                     <Field>
                       <label>Password</label>
-                      <input type="password" value={form.backupPassword} onChange={(e) => set('backupPassword', e.target.value)} />
+                      <Input type="password" value={form.backupPassword} onChange={(e) => set('backupPassword', e.target.value)} />
                     </Field>
                   </FieldRow>
                   <Field>
                     <label>数据库名</label>
-                    <input value={form.backupDatabase} placeholder="bi_ji_backup（需预先创建）" onChange={(e) => set('backupDatabase', e.target.value)} />
+                    <Input value={form.backupDatabase} placeholder="bi_ji_backup（需预先创建）" onChange={(e) => set('backupDatabase', e.target.value)} />
                   </Field>
                 </>
               )}
               <Actions>
-                <button className="btn-primary" onClick={() => void save()} disabled={saving}>
+                <Button variant="primary" onClick={() => void save()} disabled={saving}>
                   {saving ? '保存中…' : '保存配置'}
-                </button>
-                <button onClick={() => void testBackup()} disabled={busy !== null}>
+                </Button>
+                <Button onClick={() => void testBackup()} disabled={busy !== null}>
                   {busy === 'test-backup' ? '测试中…' : '测试连接'}
-                </button>
-                <button className="btn-green" onClick={() => void syncBackup()} disabled={busy !== null}>
+                </Button>
+                <Button variant="success" onClick={() => void syncBackup()} disabled={busy !== null}>
                   {busy === 'sync' ? '同步中…' : '一键备份'}
-                </button>
+                </Button>
                 {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
               </Actions>
               {lastCounts && (

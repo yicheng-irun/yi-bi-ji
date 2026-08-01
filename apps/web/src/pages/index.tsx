@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
-import { Loading } from '../components/Loading'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { Badge } from '../ui/Badge'
+import { Empty } from '../ui/Empty'
+import { Loading } from '../ui/Loading'
 import { useDocTitle } from '../hooks/use-doc-title'
 
 const Page = styled.div`
@@ -12,8 +16,7 @@ const Page = styled.div`
 
 const CreateBar = styled.div`
   display: flex; gap: 10px; align-items: center;
-  input { flex: 1; height: 42px; font-size: 15px; }
-  button { height: 42px; padding: 0 20px; }
+  .grow { flex: 1; min-width: 0; }
 `
 
 const Card = styled(Link)`
@@ -32,22 +35,6 @@ const Card = styled(Link)`
   .title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
   .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-`
-
-const Badge = styled.span`
-  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
-  background: var(--orange-bg); color: var(--orange); border: 1px solid #fcd34d;
-`
-
-const DelBadge = styled.span`
-  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
-  background: #fef2f2; color: var(--red); border: 1px solid #fecaca;
-`
-
-const Empty = styled.div`
-  text-align: center; padding: 60px 20px; color: var(--text-secondary);
-  .icon { font-size: 48px; margin-bottom: 12px; }
-  p { font-size: 15px; }
 `
 
 const Count = styled.div`
@@ -122,17 +109,19 @@ export default function NotesPage() {
   return (
     <Page>
       <CreateBar>
-        <input
+        <Input
+          size="lg"
+          className="grow"
           placeholder="新建笔记标题，回车即创建"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && create()}
         />
-        <button className="btn-primary" onClick={create}>新建笔记</button>
+        <Button size="lg" variant="primary" onClick={create}>新建笔记</Button>
       </CreateBar>
 
       {loading && <Loading />}
-      {error && !loading && <Empty><p>{error}</p></Empty>}
+      {error && !loading && <Empty title={error} />}
 
       {!loading && !error && notes.length > 0 && (
         <ChipRow>
@@ -174,20 +163,17 @@ export default function NotesPage() {
           </div>
           <div className="actions">
             {n.deletedAt
-              ? <DelBadge>待确认删除</DelBadge>
-              : n.hasChanges && <Badge>未提交</Badge>}
+              ? <Badge variant="danger">待确认删除</Badge>
+              : n.hasChanges && <Badge variant="warning">未提交</Badge>}
           </div>
         </Card>
       ))}
 
       {!loading && !error && notes.length === 0 && (
-        <Empty>
-          <div className="icon">📝</div>
-          <p>还没有笔记，在上方输入标题并回车创建第一篇</p>
-        </Empty>
+        <Empty icon="📝" title="还没有笔记，在上方输入标题并回车创建第一篇" />
       )}
       {!loading && !error && notes.length > 0 && visible.length === 0 && (
-        <Empty><p>当前过滤条件下没有笔记</p></Empty>
+        <Empty title="当前过滤条件下没有笔记" />
       )}
     </Page>
   )

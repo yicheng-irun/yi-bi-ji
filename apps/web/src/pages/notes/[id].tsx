@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { api, CLIENT_ID, type Note } from '../../api/client'
-import { Loading } from '../../components/Loading'
+import { Button } from '../../ui/Button'
+import { Loading } from '../../ui/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
-import { TagInput } from '../../components/TagInput'
+import { TagInput } from '../../ui/TagInput'
 import { useDocTitle } from '../../hooks/use-doc-title'
 import { MarkdownPreview } from '../../components/MarkdownPreview'
 
@@ -229,14 +230,14 @@ export default function NoteEditorPage() {
             <button className={mode === 'split' ? 'active' : ''} onClick={() => setMode('split')}>双列</button>
             <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}>预览</button>
           </div>
-          <button onClick={() => setShowChat((s) => !s)}>
+          <Button onClick={() => setShowChat((s) => !s)}>
             {showChat ? '隐藏 AI' : 'AI 助手'}
-          </button>
-          <button className="btn-danger" onClick={async () => {
+          </Button>
+          <Button variant="danger" onClick={async () => {
             if (!confirm('删除这篇笔记？将标记为待确认删除，需到「变更」页提交后才会真正删除。')) return
             await api.deleteNote(noteId)
             navigate('/changes')
-          }}>删除</button>
+          }}>删除</Button>
         </>,
         slotEl,
       )}
@@ -245,13 +246,13 @@ export default function NoteEditorPage() {
           <AlertBar>
             <span>远端草稿有更新，与本地未保存内容冲突</span>
             <div className="spacer" />
-            <button onClick={() => {
+            <Button onClick={() => {
               if (!pendingRemote) return
               setRemote(pendingRemote); setTitle(pendingRemote.draftTitle); setContent(pendingRemote.draftContent); setPendingRemote(null)
-            }}>放弃本地并同步</button>
-            <button className="btn-primary" onClick={() => { if (pendingRemote) save(pendingRemote) }}>
+            }}>放弃本地并同步</Button>
+            <Button variant="primary" onClick={() => { if (pendingRemote) save(pendingRemote) }}>
               用本地覆盖远端
-            </button>
+            </Button>
           </AlertBar>
         )}
 

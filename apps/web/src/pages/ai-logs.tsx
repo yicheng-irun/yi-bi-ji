@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, AI_LOG_ACTIONS, type AiChangeLogItem, type AiChangeLogDetail, type Hunk, type Note } from '../api/client'
-import { Select, type SelectOption } from '../components/Select'
-import { Loading } from '../components/Loading'
+import { Button } from '../ui/Button'
+import { Badge, type BadgeVariant } from '../ui/Badge'
+import { Empty } from '../ui/Empty'
+import { Select, type SelectOption } from '../ui/Select'
+import { Loading } from '../ui/Loading'
 import { useDocTitle } from '../hooks/use-doc-title'
 
 const Page = styled.div`
@@ -17,7 +20,7 @@ const Header = styled.div`
   .count { font-size: 12px; color: var(--text-muted); }
   .filters { display: flex; gap: 10px; margin-left: auto; }
   .filters > div { flex: initial; width: 180px; }
-  .clear-btn { flex-shrink: 0; color: var(--red); }
+  .clear-btn { flex-shrink: 0; }
 `
 
 const Row = styled.div<{ $open: boolean }>`
@@ -35,13 +38,6 @@ const RowHead = styled.div`
   &:hover { background: var(--bg-hover); }
 `
 
-const ActionBadge = styled.span<{ $action: string }>`
-  flex-shrink: 0;
-  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
-  color: ${(p) => (p.$action === 'delete_note' ? 'var(--red)' : p.$action === 'create_note' ? 'var(--green)' : 'var(--accent)')};
-  background: ${(p) => (p.$action === 'delete_note' ? '#fef2f2' : p.$action === 'create_note' ? 'var(--green-bg)' : 'var(--accent-light)')};
-`
-
 const Summary = styled.div`
   flex: 1; min-width: 0;
   font-size: 13px; color: var(--text);
@@ -49,6 +45,9 @@ const Summary = styled.div`
   .note { color: var(--accent); }
   .spacer { color: var(--text-muted); margin: 0 6px; }
 `
+
+const actionVariant = (a: string): BadgeVariant =>
+  a === 'delete_note' ? 'danger' : a === 'create_note' ? 'success' : 'accent'
 
 const Meta = styled.div<{ $open: boolean }>`
   flex-shrink: 0; font-size: 11px; color: var(--text-muted);
@@ -87,11 +86,6 @@ const LineRow = styled.div<{ $kind: string }>`
   padding: 1px 12px; white-space: pre-wrap; word-break: break-all;
   background: ${(p) => (p.$kind === '+' ? 'var(--green-bg)' : p.$kind === '-' ? '#fef2f2' : 'transparent')};
   color: ${(p) => (p.$kind === '+' ? 'var(--green)' : p.$kind === '-' ? 'var(--red)' : 'var(--text)')};
-`
-
-const Empty = styled.div`
-  text-align: center; color: var(--text-muted); font-size: 13px;
-  padding: 40px 0;
 `
 
 export default function AiLogsPage() {
@@ -181,7 +175,7 @@ export default function AiLogsPage() {
   const renderDiff = (d: AiChangeLogDetail) => {
     const hunks = d.hunks.filter((h: Hunk) => h.lines.some((l) => l[0] === '+' || l[0] === '-'))
     if (hunks.length === 0) {
-      return <Empty>内容无差异（仅元数据变更）。</Empty>
+      return <Empty compact>内容无差异（仅元数据变更）。</Empty>
     }
     return hunks.map((h, i) => (
       <HunkBox key={i}>
@@ -202,7 +196,7 @@ export default function AiLogsPage() {
           <Select value={noteId} onChange={setNoteId} options={noteOptions} />
           <Select value={action} onChange={setAction} options={actionOptions} />
         </div>
-        <button className="clear-btn" onClick={() => void clearLogs()}>清空</button>
+        <Button className="clear-btn" onClick={() => void clearLogs()}>清空</Button>
       </Header>
 
       {loading && <Loading />}
@@ -212,7 +206,7 @@ export default function AiLogsPage() {
         return (
           <Row key={log.id} $open={expanded.has(log.id)}>
             <RowHead onClick={() => void toggle(log.id)}>
-              <ActionBadge $action={log.action}>{AI_LOG_ACTIONS[log.action] ?? log.action}</ActionBadge>
+              <Badge variant={actionVariant(log.action)} shape="sm">{AI_LOG_ACTIONS[log.action] ?? log.action}</Badge>
               <Summary>
                 {log.noteId != null && log.noteTitle
                   ? <Link to={`/notes/${log.noteId}`} onClick={(e) => e.stopPropagation()}>{log.noteTitle}</Link>
@@ -238,10 +232,10 @@ export default function AiLogsPage() {
         )
       })}
 
-      {!loading && logs.length === 0 && <Empty>暂无 AI 修改记录。</Empty>}
+      {!loading && logs.length === 0 && <Empty compact>暂无 AI 修改记录。</Empty>}
 
       {!loading && logs.length > 0 && logs.length < total && (
-        <button onClick={() => load(logs.length, false)}>加载更多（{logs.length}/{total}）</button>
+        <Button onClick={() => load(logs.length, false)}>加载更多（{logs.length}/{total}）</Button>
       )}
     </Page>
   )

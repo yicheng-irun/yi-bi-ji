@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type ChangeItem } from '../../api/client'
-import { Loading } from '../../components/Loading'
+import { Button } from '../../ui/Button'
+import { Badge } from '../../ui/Badge'
+import { Empty } from '../../ui/Empty'
+import { Loading } from '../../ui/Loading'
 import { useDocTitle } from '../../hooks/use-doc-title'
 
 const Page = styled.div`
@@ -32,23 +35,12 @@ const Card = styled(Link)`
     display: flex; align-items: center; justify-content: center; font-size: 16px;
   }
   .indicator.del { background: #fef2f2; color: var(--red); }
-  .del-badge {
-    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
-    background: #fef2f2; color: var(--red); border: 1px solid #fecaca; flex-shrink: 0;
-  }
   .info { flex: 1; min-width: 0; }
   .title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 `
 
-const Empty = styled.div`
-  text-align: center; padding: 60px 20px; color: var(--text-secondary);
-  .icon { font-size: 40px; margin-bottom: 8px; }
-  p { font-size: 15px; }
-`
-
-export default function ChangesPage() {
-  const [changes, setChanges] = useState<ChangeItem[]>([])
+export default function ChangesPage() {  const [changes, setChanges] = useState<ChangeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const navigate = useNavigate()
@@ -76,11 +68,11 @@ export default function ChangesPage() {
         <h2>未提交的变更</h2>
         {!loading && <span className="count">{changes.length} 篇</span>}
         <div className="spacer" />
-        {!loading && changes.length > 0 && <button className="btn-green" onClick={commitAll}>全部提交</button>}
+        {!loading && changes.length > 0 && <Button variant="success" onClick={commitAll}>全部提交</Button>}
       </Header>
 
       {loading && <Loading />}
-      {error && !loading && <Empty><p>{error}</p></Empty>}
+      {error && !loading && <Empty title={error} />}
 
       {!loading && !error && changes.map((c) => (
         <Card key={c.id} to={`/changes/${c.id}`}>
@@ -97,15 +89,12 @@ export default function ChangesPage() {
                   : `${new Date(c.updatedAt).toLocaleString('zh-CN')}`}
             </div>
           </div>
-          {c.deletedAt && <span className="del-badge">待确认删除</span>}
+          {c.deletedAt && <Badge variant="danger">待确认删除</Badge>}
         </Card>
       ))}
 
       {!loading && !error && changes.length === 0 && (
-        <Empty>
-          <div className="icon">✔</div>
-          <p>所有笔记均已提交，没有待处理的变更</p>
-        </Empty>
+        <Empty icon="✔" title="所有笔记均已提交，没有待处理的变更" />
       )}
     </Page>
   )

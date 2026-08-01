@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Thread } from '../api/client'
+import { Button } from '../ui/Button'
 import { ChatPanel } from '../components/ChatPanel'
-import { Loading } from '../components/Loading'
+import { Loading } from '../ui/Loading'
 import { useDocTitle } from '../hooks/use-doc-title'
 
 const Wrap = styled.div`
@@ -15,7 +16,7 @@ const ThreadList = styled.div`
   width: 260px; flex-shrink: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: 4px;
 
-  button { height: 36px; margin-bottom: 4px; }
+  .new-thread { height: 36px; margin-bottom: 4px; }
 `
 
 const ThreadItem = styled.div<{ $active: boolean }>`
@@ -89,7 +90,7 @@ export default function ConversationsPage() {
   return (
     <Wrap>
       <ThreadList>
-        <button onClick={() => setActiveId('')}>+ 新建全局对话</button>
+        <Button className="new-thread" onClick={() => setActiveId('')}>+ 新建全局对话</Button>
 
         {loading && <Loading />}
         {error && !loading && <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: 8 }}>{error}</p>}
