@@ -73,12 +73,15 @@ export interface OpenCodeClientOptions {
   password?: string
   /** 单个请求超时（毫秒），默认 15s；健康检查等需快速失败场景可设更短 */
   timeoutMs?: number
+  /** 执行类请求（sendMessage / shell）超时（毫秒），默认 10 分钟 */
+  taskTimeoutMs?: number
 }
 
 export class OpenCodeClient {
   private baseURL: string
   private auth: string | null
   private timeoutMs: number
+  private taskTimeoutMs: number
 
   constructor(options: OpenCodeClientOptions) {
     this.baseURL = options.baseURL.replace(/\/+$/, '')
@@ -87,9 +90,10 @@ export class OpenCodeClient {
         ? 'Basic ' + Buffer.from(`${options.username ?? 'opencode'}:${options.password ?? ''}`).toString('base64')
         : null
     this.timeoutMs = options.timeoutMs ?? 15000
+    this.taskTimeoutMs = options.taskTimeoutMs ?? 600000
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
     const res = await fetch(this.baseURL + path, {
       method,
       headers: {
@@ -97,7 +101,7 @@ export class OpenCodeClient {
         ...(this.auth ? { Authorization: this.auth } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: AbortSignal.timeout(timeoutMs ?? this.timeoutMs),
     })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -133,12 +137,12 @@ export class OpenCodeClient {
     return this.request('POST', '/session', body ?? {})
   }
 
-  /** POST /session/:id/message — 发送消息并等待回复 */
+  /** POST /session/:id/message — 发送消息并等待回复（执行类，走长超时） */
   sendMessage(
     id: string,
     body: { parts: { type: string; text?: string }[]; agent?: string; model?: string },
   ): Promise<OpenCodeMessageResult> {
-    return this.request('POST', `/session/${encodeURIComponent(id)}/message`, body)
+    return this.request('POST', `/session/${encodeURIComponent(id)}/message`, body, this.taskTimeoutMs)
   }
 
   /** POST /session/:id/abort — 中止运行中的会话 */
@@ -151,8 +155,8 @@ export class OpenCodeClient {
     return this.request('GET', `/find?pattern=${encodeURIComponent(pattern)}`)
   }
 
-  /** POST /session/:id/shell — 让 opencode 执行 shell 命令 */
+  /** POST /session/:id/shell — 让 opencode 执行 shell 命令（执行类，走长超时） */
   shell(id: string, body: { command: string; agent?: string; model?: string }): Promise<OpenCodeMessageResult> {
-    return this.request('POST', `/session/${encodeURIComponent(id)}/shell`, body)
+    return this.request('POST', `/session/${encodeURIComponent(id)}/shell`, body, this.taskTimeoutMs)
   }
 }

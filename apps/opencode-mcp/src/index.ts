@@ -20,6 +20,14 @@ const serveManager = new ServeManager({
 
 app.get('/health', (c) => c.json({ ok: true }))
 
+if (env.mcpToken) {
+  app.use('/mcp', async (c, next) => {
+    const auth = c.req.header('authorization')
+    if (auth === `Bearer ${env.mcpToken}`) return next()
+    return c.json({ error: 'unauthorized' }, 401)
+  })
+}
+
 const transport = new WebStandardStreamableHTTPServerTransport({
   sessionIdGenerator: () => crypto.randomUUID(),
 })

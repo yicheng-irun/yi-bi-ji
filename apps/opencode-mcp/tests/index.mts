@@ -4,6 +4,7 @@ import { once } from 'node:events'
 
 const MCP_PORT = 15312
 const OPENCODE_PORT = 15313
+const MCP_TOKEN = 'test-secret-token'
 const BASE = `http://127.0.0.1:${MCP_PORT}/mcp`
 
 let passed = 0
@@ -35,7 +36,7 @@ async function waitForServer(timeoutMs = 60000) {
 let child: ChildProcess | null = null
 
 async function main() {
-  console.log(`启动 opencode-mcp bridge (mcp=${MCP_PORT}, opencode=${OPENCODE_PORT})`)
+  console.log(`启动 opencode-mcp bridge (mcp=${MCP_PORT}, opencode=${OPENCODE_PORT}, token 鉴权)`)
   child = spawn('npx', ['tsx', 'src/index.ts'], {
     cwd: new URL('..', import.meta.url).pathname,
     env: {
@@ -44,13 +45,19 @@ async function main() {
       MCP_HOSTNAME: '127.0.0.1',
       OPENCODE_PORT: String(OPENCODE_PORT),
       OPENCODE_HOSTNAME: '127.0.0.1',
+      MCP_TOKEN,
     },
     stdio: ['ignore', 'inherit', 'inherit'],
     detached: true,
   })
   await waitForServer()
 
-  const client = await createMCPClient({ transport: { type: 'http', url: BASE } })
+  const noAuth = await fetch(BASE, { method: 'POST', body: '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' })
+  check('无令牌访问 /mcp 返回 401', noAuth.status === 401)
+
+  const client = await createMCPClient({
+    transport: { type: 'http', url: BASE, headers: { Authorization: `Bearer ${MCP_TOKEN}` } },
+  })
   const tools = await client.tools()
   const toolNames = Object.keys(tools)
   console.log('  工具:', toolNames.join(', '))

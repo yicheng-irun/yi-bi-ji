@@ -27,11 +27,18 @@ opencode 的 MCP 桥接子应用：把常驻的 `opencode serve`（HTTP API）�
 ```
 
 - `apps/opencode-mcp` 是 pnpm workspace 的第三个包（根 `pnpm-workspace.yaml` 用 `apps/*` glob，新目录自动纳入）。
-- bi-ji 设置页 → MCP 服务器 → 新增一行：
+- bi-ji 设置页 → MCP 服务器 → 新增一行（若 bridge 配了 `MCP_TOKEN`，需在 `headers` 里带 `Authorization: Bearer <token>`）：
   ```json
-  { "name": "opencode", "type": "http", "url": "http://127.0.0.1:9410/mcp", "enabled": true }
+  { "name": "opencode", "type": "http", "url": "http://127.0.0.1:29420/mcp", "headers": { "Authorization": "Bearer xxx" }, "enabled": true }
   ```
 - 用 pm2 独立部署并守护本子应用（`ecosystem.config.cjs`）。
+
+## 跨机器 / 局域网部署
+
+- bridge 默认监听 `0.0.0.0:29420`，可在局域网另一台机器启动；本机 bi-ji 配 `url: "http://<远程IP>:29420/mcp"` 即可让 agent 驱动**那台机器**上的 opencode（`OPENCODE_PROJECT_DIR` 即远程机器上 agent 操作的项目目录）。
+- **务必设置 `MCP_TOKEN`**（`Authorization: Bearer` 校验），否则局域网内任何能连到 29420 的人都能调用 opencode 工具（含执行任意 shell 命令）。`/health` 不带鉴权，仅用于连通性探测。
+- `opencode serve` 建议同时设 `OPENCODE_PASSWORD`（HTTP Basic auth）。
+- 明文 HTTP 走局域网可接受；跨公网请用 SSH 隧道或 TLS 层保护。
 
 ## 已定的决策
 
@@ -85,11 +92,13 @@ apps/opencode-mcp/
 
 ### 2. MCP server（index.ts）
 - 用 `@modelcontextprotocol/sdk` 的 `WebStandardStreamableHTTPServerTransport`，Hono 暴露 `app.all('/mcp', (c) => transport.handleRequest(c.req.raw))`（stateful，`sessionIdGenerator`），与 bi-ji 的 `@ai-sdk/mcp` http 客户端互通。
+- **鉴权**：配置 `MCP_TOKEN` 后，Hono 中间件校验 `/mcp` 请求的 `Authorization: Bearer <token>`，不匹配返回 401；`/health` 不受保护。
 - 注册上面 7~8 个工具；`opencode_client` 实例注入工具闭包。
-- 端口默认 `9410`（避免与 bi-ji 15201 / opencode 4096 冲突），路径 `/mcp`。
+- 端口默认 `29420`（避免与 bi-ji 15201 / opencode 4096 冲突），路径 `/mcp`。
 
 ### 3. opencode-client.ts
-- 封装 fetch，统一处理 Basic auth（`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`）；所有请求带超时（默认 15s，可配 `timeoutMs`）。
+- 封装 fetch，统一处理 Basic auth（`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`）；所有请求带超时。
+- 超时策略：普通请求默认 15s（可配 `timeoutMs`，健康检查 3s）；**执行类请求（`sendMessage`/`shell`，即 `opencode_prompt`/`opencode_continue`/`opencode_run_shell`）走长超时默认 10 分钟**（可配 `taskTimeoutMs`），避免真实开发任务被误杀。
 - 提供 `health / listSessions / getSession / getMessages / createSession / sendMessage / abort / find / shell` 方法，返回类型参考 opencode 的 OpenAPI（`/doc` 或 `@opencode-ai/sdk` 的 types）。
 
 ### 4. 会话续接（可选增强，涉及 bi-ji）
@@ -103,17 +112,17 @@ apps/opencode-mcp/
 ## pm2 部署（生态文件示意）
 
 ```js
-// ecosystem.config.cjs（预期）
+// ecosystem.config.cjs
 module.exports = {
   apps: [{
     name: 'opencode-mcp',
     script: 'pnpm',
-    args: '--filter @bi-ji/opencode-mcp dev',
+    args: '--filter @bi-ji/opencode-mcp start',
     cwd: '<repo 根路径>',
     autorestart: true,
     max_restarts: 10,
     restart_delay: 3000,
-    env: { OPENCODE_PORT: '4096', MCP_PORT: '9410' },
+    env: { OPENCODE_PORT: '4096', MCP_PORT: '29420', MCP_TOKEN: 'xxx' },
   }],
 }
 ```
@@ -129,6 +138,8 @@ module.exports = {
 - [x] `.env.example`：`OPENCODE_URL` / `OPENCODE_PORT` / `OPENCODE_USERNAME` / `OPENCODE_PASSWORD` / `MCP_PORT`
 - [x] `ecosystem.config.cjs`
 - [x] 冒烟验证：`opencode serve` 起后被 mcp 连上；用 MCP 客户端（或 bi-ji 设置页工具预览）列出工具
+- [x] MCP 鉴权：`MCP_TOKEN` Bearer 校验（未带 token 返回 401）
+- [x] 长任务超时：执行类工具（prompt/continue/run_shell）默认 10 分钟，普通请求 15s
 - [ ] 端到端：bi-ji 侧配置后 agent 调 `opencode_status` → `opencode_prompt` 完整走通
 - [ ] （可选增强）bi-ji 侧 `chat_threads.metadata.opencodeSessionId` 续接
 - [x] 更新根 `FEATURES.md`：新增「OpenCode 集成」说明

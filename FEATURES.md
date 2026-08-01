@@ -97,12 +97,13 @@
 ## OpenCode 集成（`apps/opencode-mcp`）
 
 - 独立子应用（`@bi-ji/opencode-mcp`，pnpm workspace 第三个包）：把常驻的 `opencode serve`（HTTP API）封装成标准 MCP 服务器，供 bi-ji 笔记 agent 通过 MCP http transport 调用，实现「在笔记对话里让 agent 驱动 opencode 做开发、查会话、续接对话」
-- 架构：`bi-ji server →(MCP http:9410)→ apps/opencode-mcp bridge →(http)→ opencode serve`；bridge 用 Hono + `@modelcontextprotocol/sdk` 的 `WebStandardStreamableHTTPServerTransport`（端点 `/mcp`），pm2 独立部署守护
-- 会话机制：opencode serve 常驻（由 bridge spawn + 守护，崩溃自动退避重启），session id 由 opencode 持久化，bridge 无状态转发；bi-ji 侧在设置页 MCP tab 配置 `{ "name": "opencode", "type": "http", "url": "http://127.0.0.1:9410/mcp" }` 即可，工具以 `mcp__opencode__opencode_*` 挂载
+- 架构：`bi-ji server →(MCP http:29420)→ apps/opencode-mcp bridge →(http)→ opencode serve`；bridge 用 Hono + `@modelcontextprotocol/sdk` 的 `WebStandardStreamableHTTPServerTransport`（端点 `/mcp`），pm2 独立部署守护
+- 会话机制：opencode serve 常驻（由 bridge spawn + 守护，崩溃自动退避重启），session id 由 opencode 持久化，bridge 无状态转发；bi-ji 侧在设置页 MCP tab 配置 `{ "name": "opencode", "type": "http", "url": "http://127.0.0.1:29420/mcp", "headers": { "Authorization": "Bearer <token>" } }` 即可，工具以 `mcp__opencode__opencode_*` 挂载
 - 工具集（围绕会话生命周期）：`opencode_status`（健康/版本）、`opencode_list_sessions`、`opencode_get_session`（详情+消息历史）、`opencode_prompt`（创建会话并发消息，返回 session id）、`opencode_continue`（按 session id 续接）、`opencode_abort`、`opencode_search`（跨文件搜索）、`opencode_run_shell`（在会话上下文执行 shell 命令）
-- 配置（`.env`，参考 `.env.example`）：`OPENCODE_URL`（外部 serve 地址，设置后不再 spawn）、`OPENCODE_PORT`/`OPENCODE_HOSTNAME`/`OPENCODE_PROJECT_DIR`（默认仓库根）、`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`（HTTP Basic auth，spawn 时透传给 serve）、`MCP_PORT`（默认 9410）
-- 请求统一带超时（默认 15s，健康检查 3s），避免 serve 初始化慢时 MCP 握手挂起
-- 测试：`tests/index.mts`（`pnpm --filter @bi-ji/opencode-mcp test`）起 bridge + spawn serve，用 `@ai-sdk/mcp` 客户端验证 8 个工具注册与 `opencode_status` 全链路
+- 配置（`.env`，参考 `.env.example`）：`OPENCODE_URL`（外部 serve 地址，设置后不再 spawn）、`OPENCODE_PORT`/`OPENCODE_HOSTNAME`/`OPENCODE_PROJECT_DIR`（默认仓库根）、`OPENCODE_USERNAME`/`OPENCODE_PASSWORD`（HTTP Basic auth，spawn 时透传给 serve）、`MCP_PORT`（默认 29420）、`MCP_TOKEN`（MCP 端点 Bearer 令牌，局域网部署务必设置）
+- 跨机器/局域网：bridge 默认监听 `0.0.0.0:29420`，本机 bi-ji 可连远程机器的 `/mcp` 驱动那台机器的 opencode；`/health` 不带鉴权仅做连通性探测
+- 超时策略：普通请求默认 15s（健康检查 3s）避免握手挂起；执行类工具（`opencode_prompt`/`opencode_continue`/`opencode_run_shell`）走长超时默认 10 分钟，避免真实开发任务被误杀
+- 测试：`tests/index.mts`（`pnpm --filter @bi-ji/opencode-mcp test`）起 bridge + spawn serve（带 `MCP_TOKEN`），用 `@ai-sdk/mcp` 客户端验证 401 鉴权、8 个工具注册与 `opencode_status` 全链路
 - 数据库备份（`POST /api/backup/test`、`POST /api/backup/sync`）：支持两种备份类型，类型与连接信息存 `app_settings` 的 `backup*` 键
   - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
   - MySQL（`backupType=mysql`）：填 Host/Port/User/Password/数据库名（需预先建库）

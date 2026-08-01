@@ -18,8 +18,10 @@ function resolveProjectDir(): string {
 
 export const env = {
   /** 本 MCP 服务器监听端口 */
-  mcpPort: Number(process.env.MCP_PORT ?? 9410),
+  mcpPort: Number(process.env.MCP_PORT ?? 29420),
   mcpHostname: process.env.MCP_HOSTNAME ?? '0.0.0.0',
+  /** MCP 端点访问令牌（Bearer）；为空则 `/mcp` 不做鉴权（局域网需务必设置） */
+  mcpToken: process.env.MCP_TOKEN ?? '',
   /** opencode serve 地址；显式设置则不再由本进程 spawn */
   opencodeUrl: process.env.OPENCODE_URL ?? '',
   opencodePort: Number(process.env.OPENCODE_PORT ?? 4096),
