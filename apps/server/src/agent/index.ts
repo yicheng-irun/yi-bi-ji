@@ -6,7 +6,7 @@ import { getSettings } from '../services/settings.js'
 import { createNoteTools, parseEnabledTools } from './tools.js'
 import { loadMcpToolsCached, parseMcpServers } from './mcp.js'
 
-export async function createNoteAgent(threadId: string) {
+export async function createNoteAgent(threadId: string, opts: { voiceMode?: boolean } = {}) {
   const s = getSettings()
   const enabledMcp = parseMcpServers(s.mcpServers).filter((sv) => sv.enabled !== false)
   const mcp = await loadMcpToolsCached(enabledMcp)
@@ -47,7 +47,10 @@ export async function createNoteAgent(threadId: string) {
 3. replace_in_note 失败时，按工具返回的原因，先用 read_note 重读再重试。
 4. 不要一次性把所有笔记塞入上下文；先搜索/列表，再按需读取。
 5. ${noteContext}
-6. 用中文回复，保持简洁。`,
+6. 用中文回复，保持简洁。
+${opts.voiceMode
+  ? `7. 本条消息来自语音输入，语音转写可能不准确。若指令含糊、或涉及数字/专有名词/笔记标题等疑似听错的内容，先简短追问澄清再执行，不要猜测。回复尽量用短句、口语化表达，便于朗读。`
+  : ''}`,
     tools: createNoteTools(
       threadId,
       parseEnabledTools(s.aiTools),

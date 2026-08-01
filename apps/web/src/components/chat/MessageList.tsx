@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
+import styled from 'styled-components'
 import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCardBox, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
+import { extractSpeakableText, speakText } from '../../lib/tts'
+
+const SpeakBtn = styled.button`
+  align-self: flex-start;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); padding: 3px 8px; cursor: pointer;
+  &:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+`
 
 interface SubagentMessage {
   parts?: UIMessage['parts']
@@ -131,11 +143,29 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
 }
 
 function MessageItem({ message }: { message: UIMessage }) {
+  const speakable = extractSpeakableText(message).trim()
+  const [speaking, setSpeaking] = useState(false)
+  const speak = async () => {
+    if (!speakable) return
+    setSpeaking(true)
+    try {
+      await speakText(speakable)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSpeaking(false)
+    }
+  }
   return (
     <MessageRow $role={message.role}>
       <Avatar $role={message.role}>{roleAvatars[message.role] ?? '?'}</Avatar>
       <MessageContent $role={message.role}>
         <MessageParts message={message} />
+        {message.role === 'assistant' && speakable && (
+          <SpeakBtn onClick={() => void speak()} disabled={speaking}>
+            {speaking ? '…' : '🔊'} 朗读
+          </SpeakBtn>
+        )}
       </MessageContent>
     </MessageRow>
   )

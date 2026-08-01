@@ -5,6 +5,7 @@ import { api, type Thread } from '../api/client'
 import { ContextBar } from './chat/styles'
 import { MessageList } from './chat/MessageList'
 import { ChatInput } from './chat/ChatInput'
+import { extractSpeakableText, speakText } from '../lib/tts'
 
 interface ChatPanelProps {
   threadId: string
@@ -15,6 +16,9 @@ interface ChatPanelProps {
 export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const [contextInfo, setContextInfo] = useState<{ messageCount: number; estimatedTokens: number } | null>(null)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [voiceAutoSend, setVoiceAutoSend] = useState(true)
+  const [voiceAutoSpeak, setVoiceAutoSpeak] = useState(false)
 
   const threadIdRef = useRef(threadId)
   threadIdRef.current = threadId
@@ -22,6 +26,17 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   noteIdRef.current = currentNoteId
   const onThreadCreatedRef = useRef(onThreadCreated)
   onThreadCreatedRef.current = onThreadCreated
+  const voiceAutoSpeakRef = useRef(voiceAutoSpeak)
+  voiceAutoSpeakRef.current = voiceAutoSpeak
+  const autoSpeakTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      setVoiceEnabled(!!s.voiceApiKey.trim())
+      setVoiceAutoSend(s.voiceAutoSend !== '0')
+      setVoiceAutoSpeak(s.voiceAutoSpeak === '1')
+    }).catch(() => {})
+  }, [])
 
   const transport = useMemo(
     () =>
@@ -55,7 +70,18 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   const { messages, sendMessage, setMessages, status, error } = useChat({
     transport,
-    onFinish: () => refreshContext(threadIdRef.current),
+    onFinish: ({ message }) => {
+      refreshContext(threadIdRef.current)
+      if (!voiceAutoSpeakRef.current || !message) return
+      // agent 按步骤产出多条 assistant 消息，只朗读最终回复（用防抖只留最后一条）
+      const text = extractSpeakableText(message)
+      if (!text.trim()) return
+      if (autoSpeakTimer.current) clearTimeout(autoSpeakTimer.current)
+      autoSpeakTimer.current = setTimeout(() => {
+        autoSpeakTimer.current = null
+        void speakText(text).catch(() => {})
+      }, 600)
+    },
     onError: (e) => console.error(e),
   })
 
@@ -73,11 +99,15 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
     }).catch(console.error)
   }, [threadId, setMessages])
 
-  const send = () => {
-    const text = input.trim()
-    if (!text || streaming) return
+  const send = (text?: string) => {
+    const t = (text ?? input).trim()
+    if (!t || streaming) return
     setInput('')
-    void sendMessage({ text })
+    if (text !== undefined) {
+      void sendMessage({ text: t, metadata: { inputMethod: 'voice' } })
+    } else {
+      void sendMessage({ text: t })
+    }
   }
 
   return (
@@ -90,7 +120,15 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
             : contextInfo.estimatedTokens} tokens · {contextInfo.messageCount} 条消息
         </ContextBar>
       )}
-      <ChatInput value={input} onChange={setInput} onSend={send} disabled={streaming} />
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={send}
+        disabled={streaming}
+        voiceEnabled={voiceEnabled}
+        voiceAutoSend={voiceAutoSend}
+        transcribeAudio={api.transcribeAudio}
+      />
     </>
   )
 }

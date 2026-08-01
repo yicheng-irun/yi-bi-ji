@@ -64,11 +64,14 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
   }
   if (!newMessage) return c.json({ error: 'message is required' }, 400)
 
+  const md = newMessage.metadata
+  const voiceMode = !!md && typeof md === 'object' && (md as Record<string, unknown>).inputMethod === 'voice'
+
   const history = (await loadHistory(threadId)).slice(-MAX_CONTEXT_MESSAGES)
   const knownIds = new Set(history.map((m) => m.id))
   const uiMessages = [...history, newMessage]
 
-  const agent = await createNoteAgent(threadId)
+  const agent = await createNoteAgent(threadId, { voiceMode })
   type AgentUIMessage = InferAgentUIMessage<typeof agent>
 
   return createAgentUIStreamResponse({

@@ -61,6 +61,18 @@
 - 工具调用卡片可点击展开/收起（`MessageList.tsx` 的 `ToolCard`）：默认收起为工具名小条，展开后展示入参 JSON、执行结果（文本/JSON/子代理过程）与错误信息；子代理运行中自动展开以实时展示进度，普通工具保持收起
 - 自定义下拉选择组件 `Select`（`apps/web/src/ui/Select.tsx`）：替代原生 `<select>`，自绘 SVG 箭头图标，菜单为自绘浮层（点击外部/Esc 关闭、方向键 + Enter 选择、悬停高亮），用于 AI 侧边栏顶部的会话切换下拉
 
+## 语音对话
+
+- 语音输入（推按说话）：`ChatInput` 麦克风按钮，`onPointerDown` 开始录音（`AudioContext` 采集 PCM，重采样到 16kHz 单声道并编码为 WAV）、`onPointerUp` 松开即转文字发送（`apps/web/src/lib/useVoiceRecorder.ts`）
+- 默认「松开即发送」（`voiceAutoSend`），可配置为「转文字填入输入框待编辑」
+- ASR 走阿里云百炼 DashScope：`POST {voiceAsrUrl}/chat/completions`（OpenAI 兼容，`model=qwen3-asr-flash`，`input_audio` 传 WAV data URI），由 `apps/server/src/services/voice.ts` 实现；`apps/server/src/routes/voice.ts` 提供 `POST /api/voice/transcribe`（浏览器上传音频 blob）、`POST /api/voice/speech`（文字合成 MP3）、`POST /api/voice/test`
+- AI 回复朗读：`MessageList` 每条 AI 回复带「🔊 朗读」按钮（只读正文文本部分，跳过工具卡片/思考过程）；TTS 走 DashScope 非实时语音合成（`.../api/v1/services/audio/tts/SpeechSynthesizer`，模型如 `qwen-audio-3.0-tts-flash`/`cosyvoice-v2`，返回 JSON 中的 `output.audio.url` 再下载音频），`apps/web/src/lib/tts.ts` 负责播放与停止
+- 朗读缓存两级：服务端按「文本+模型+音色」哈希落盘 `dataDir/voice-cache/*.mp3`（同内容只调一次合成 API，避免重复计费）；前端会话内内存缓存（同文本再次朗读零请求，LRU 上限 60 条）
+- 自动朗读开关（`voiceAutoSpeak`）：AI 流式回复结束后自动朗读最终回复（用 600ms 防抖只朗读最后一条 assistant 消息，避免 agent 按步骤产生的中间消息被读出）
+- 语音模式系统提示词：语音消息通过 `sendMessage({ metadata: { inputMethod: 'voice' } })` 标记，服务端 `chat.ts` 识别后给 agent 注入「语音转写可能不准，指令含糊/关键词可疑先追问澄清再执行、回复短句口语化」的规则
+- 设置页「语音」分类（`app_settings` 的 `voice*` 键）：`voiceProvider`（aliyun/custom）、`voiceApiKey`（也可用 `.env` 的 `VOICE_API_KEY`）、`voiceAsrUrl`/`voiceAsrModel`、`voiceTtsUrl`/`voiceTtsModel`/`voiceTtsVoice`、`voiceLang`、`voiceAutoSpeak`、`voiceAutoSend`；未配置 API Key 时聊天框不显示麦克风按钮
+- 百炼 2.0 工作空间账户：`.env` 配 `WORKSPACE_ID` 后自动推导 ASR/TTS 接口地址（`https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/...`），设置页保存的值优先
+
 ## 前端组件库（`apps/web/src/ui/`）
 
 - 仓库无第三方组件库，沉淀自有 UI 组件库 `src/ui/`（barrel 导出 `index.ts`），通用原语统一放这里，业务/功能组件留在 `src/components/`（ChatPanel/ChatSidebar/MarkdownPreview/chat 等）

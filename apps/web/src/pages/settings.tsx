@@ -207,6 +207,7 @@ const TABS = [
   { key: 'agent', label: 'Agent 能力', icon: '🧩' },
   { key: 'browser', label: '浏览器控制', icon: '🌐' },
   { key: 'mcp', label: 'MCP 服务器', icon: '🔌' },
+  { key: 'voice', label: '语音', icon: '🎙' },
   { key: 'backup', label: '数据备份', icon: '💾' },
 ] as const
 
@@ -219,6 +220,11 @@ const MCP_TYPE_OPTIONS = [
   { value: 'http', label: 'http（推荐）' },
   { value: 'sse', label: 'sse' },
   { value: 'stdio', label: 'stdio' },
+]
+
+const VOICE_PROVIDER_OPTIONS = [
+  { value: 'aliyun', label: '阿里云百炼（DashScope）' },
+  { value: 'custom', label: '自定义' },
 ]
 
 type TabKey = typeof TABS[number]['key']
@@ -526,6 +532,19 @@ export default function SettingsPage() {
       setStatus({ ok: true, text: '已断开（不会关闭你的浏览器，下次操作自动重连）' })
     } catch (e) {
       setStatus({ ok: false, text: (e as Error).message || '断开失败' })
+    }
+  }
+
+  const testVoice = async () => {
+    setStatus(null)
+    setBusy('test-voice')
+    try {
+      const r = await api.testVoice()
+      setStatus(r.ok ? { ok: true, text: '连接成功（已合成测试语音）' } : { ok: false, text: r.error || '连接失败' })
+    } catch (e) {
+      setStatus({ ok: false, text: (e as Error).message || '测试失败' })
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -897,6 +916,89 @@ export default function SettingsPage() {
                 />
               )}
             </>
+          )}
+
+          {tab === 'voice' && (
+            <Card>
+              <h3>语音服务</h3>
+              <div className="hint">
+                语音输入（按住说话转文字发送）与 AI 回复朗读。默认走阿里云百炼（DashScope）：语音识别用{' '}
+                <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>qwen3-asr-flash</code>（OpenAI 兼容接口），
+                朗读用 CosyVoice。填好 API Key 保存后，聊天输入框会出现麦克风按钮；未配置时不显示。
+              </div>
+              <Field>
+                <label>服务类型</label>
+                <div className="select-row">
+                  <Select value={form.voiceProvider} onChange={(v) => set('voiceProvider', v)} options={VOICE_PROVIDER_OPTIONS} />
+                </div>
+              </Field>
+              <Field>
+                <label>API Key（DashScope 的 DASHSCOPE_API_KEY）</label>
+                <Input type="password" value={form.voiceApiKey} placeholder="sk-..." onChange={(e) => set('voiceApiKey', e.target.value)} />
+                <div className="hint">也可用 .env 里的 VOICE_API_KEY 配置，这里填的值优先。</div>
+              </Field>
+              <FieldRow>
+                <Field>
+                  <label>ASR 接口地址</label>
+                  <Input value={form.voiceAsrUrl} onChange={(e) => set('voiceAsrUrl', e.target.value)} />
+                  <div className="hint">
+                    百炼新版账户需用工作空间地址：https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+                  </div>
+                </Field>
+                <Field>
+                  <label>ASR 模型</label>
+                  <Input value={form.voiceAsrModel} onChange={(e) => set('voiceAsrModel', e.target.value)} />
+                </Field>
+              </FieldRow>
+              <FieldRow>
+                <Field>
+                  <label>TTS 接口地址</label>
+                  <Input value={form.voiceTtsUrl} onChange={(e) => set('voiceTtsUrl', e.target.value)} />
+                  <div className="hint">
+                    百炼新版账户需用工作空间地址：https://&lt;WorkspaceId&gt;.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer（模型/音色参考该文档列表）
+                  </div>
+                </Field>
+                <Field>
+                  <label>TTS 模型</label>
+                  <Input value={form.voiceTtsModel} onChange={(e) => set('voiceTtsModel', e.target.value)} />
+                </Field>
+              </FieldRow>
+              <FieldRow>
+                <Field>
+                  <label>朗读音色</label>
+                  <Input value={form.voiceTtsVoice} onChange={(e) => set('voiceTtsVoice', e.target.value)} />
+                </Field>
+                <Field>
+                  <label>识别语种</label>
+                  <Input value={form.voiceLang} onChange={(e) => set('voiceLang', e.target.value)} />
+                </Field>
+              </FieldRow>
+              <EnableRow>
+                <Toggle
+                  $on={form.voiceAutoSpeak === '1'}
+                  title={form.voiceAutoSpeak === '1' ? '已启用' : '已停用'}
+                  onClick={() => set('voiceAutoSpeak', form.voiceAutoSpeak === '1' ? '0' : '1')}
+                />
+                <span>AI 回复自动朗读</span>
+              </EnableRow>
+              <EnableRow>
+                <Toggle
+                  $on={form.voiceAutoSend === '1'}
+                  title={form.voiceAutoSend === '1' ? '已启用' : '已停用'}
+                  onClick={() => set('voiceAutoSend', form.voiceAutoSend === '1' ? '0' : '1')}
+                />
+                <span>按住说话松开即发送（关闭则转文字填入输入框待编辑）</span>
+              </EnableRow>
+              <Actions>
+                <Button variant="primary" onClick={() => void save()} disabled={saving}>
+                  {saving ? '保存中…' : '保存'}
+                </Button>
+                <Button onClick={() => void testVoice()} disabled={busy !== null}>
+                  {busy === 'test-voice' ? '测试中…' : '测试连接'}
+                </Button>
+                {status && <span className={`status ${status.ok ? 'ok' : 'err'}`}>{status.text}</span>}
+              </Actions>
+            </Card>
           )}
 
           {tab === 'backup' && (

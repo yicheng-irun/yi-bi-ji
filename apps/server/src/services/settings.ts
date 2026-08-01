@@ -23,6 +23,26 @@ export interface Settings {
   backupUser: string
   backupPassword: string
   backupDatabase: string
+  /** 语音服务：后端类型（aliyun=阿里云百炼 DashScope，默认） */
+  voiceProvider: string
+  /** 语音服务：API Key（DashScope 的 DASHSCOPE_API_KEY） */
+  voiceApiKey: string
+  /** 语音服务：ASR 接口地址（OpenAI 兼容 chat/completions 的 base，如 DashScope compatible-mode） */
+  voiceAsrUrl: string
+  /** 语音服务：ASR 模型名，如 qwen3-asr-flash */
+  voiceAsrModel: string
+  /** 语音服务：TTS 接口地址（如 DashScope CosyVoice text2audio generation） */
+  voiceTtsUrl: string
+  /** 语音服务：TTS 模型名，如 cosyvoice-v2 */
+  voiceTtsModel: string
+  /** 语音服务：TTS 音色名，如 longxiaochun_pub */
+  voiceTtsVoice: string
+  /** 语音服务：识别语种，如 zh */
+  voiceLang: string
+  /** 语音服务：AI 回复自动朗读，'1' 启用 / '0' 关闭 */
+  voiceAutoSpeak: string
+  /** 语音服务：推按说话松开后是否直接发送（'1' 直发 / '0' 填入输入框待编辑） */
+  voiceAutoSend: string
 }
 
 const cache: Record<string, string> = {}
@@ -50,6 +70,24 @@ export function getSettings(): Settings {
     backupUser: cache.backupUser ?? '',
     backupPassword: cache.backupPassword ?? '',
     backupDatabase: cache.backupDatabase ?? '',
+    voiceProvider: cache.voiceProvider ?? 'aliyun',
+    voiceApiKey: cache.voiceApiKey ?? env.voiceApiKey ?? '',
+    voiceAsrUrl:
+      cache.voiceAsrUrl ??
+      (env.voiceWorkspaceId
+        ? `https://${env.voiceWorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`
+        : 'https://dashscope.aliyuncs.com/compatible-mode/v1'),
+    voiceAsrModel: cache.voiceAsrModel ?? 'qwen3-asr-flash',
+    voiceTtsUrl:
+      cache.voiceTtsUrl ??
+      (env.voiceWorkspaceId
+        ? `https://${env.voiceWorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer`
+        : 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer'),
+    voiceTtsModel: cache.voiceTtsModel ?? 'qwen-audio-3.0-tts-flash',
+    voiceTtsVoice: cache.voiceTtsVoice ?? 'longanhuan_v3.6',
+    voiceLang: cache.voiceLang ?? 'zh',
+    voiceAutoSpeak: cache.voiceAutoSpeak ?? '0',
+    voiceAutoSend: cache.voiceAutoSend ?? '1',
   }
 }
 

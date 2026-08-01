@@ -162,6 +162,30 @@ export const api = {
     request<BrowserTestResult>('/api/browser/test', { method: 'POST', body: JSON.stringify({ url }) }),
   disconnectBrowser: () =>
     request<{ ok: boolean }>('/api/browser/disconnect', { method: 'POST', body: '{}' }),
+  transcribeAudio: async (blob: Blob) => {
+    const res = await fetch('/api/voice/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/wav' },
+      body: blob,
+    })
+    const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
+    if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`)
+    return json.text ?? ''
+  },
+  speech: async (text: string) => {
+    const res = await fetch('/api/voice/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(json.error ?? `HTTP ${res.status}`)
+    }
+    return await res.blob()
+  },
+  testVoice: () =>
+    request<{ ok: boolean; error?: string }>('/api/voice/test', { method: 'POST', body: '{}' }),
 }
 
 export interface McpToolInfo {
@@ -224,6 +248,16 @@ export interface Settings {
   backupUser: string
   backupPassword: string
   backupDatabase: string
+  voiceProvider: string
+  voiceApiKey: string
+  voiceAsrUrl: string
+  voiceAsrModel: string
+  voiceTtsUrl: string
+  voiceTtsModel: string
+  voiceTtsVoice: string
+  voiceLang: string
+  voiceAutoSpeak: string
+  voiceAutoSend: string
 }
 
 export interface CdpTabInfo {

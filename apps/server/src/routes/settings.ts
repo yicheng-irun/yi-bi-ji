@@ -14,6 +14,8 @@ settingsRoutes.put('/', async (c) => {
     'aiBaseURL', 'aiApiKey', 'aiModel', 'reasoningEffort', 'aiTools', 'aiSubagentTools', 'mcpServers',
     'browserCdpEnabled', 'browserCdpUrl',
     'backupType', 'backupPath', 'backupHost', 'backupPort', 'backupUser', 'backupPassword', 'backupDatabase',
+    'voiceProvider', 'voiceApiKey', 'voiceAsrUrl', 'voiceAsrModel', 'voiceTtsUrl', 'voiceTtsModel', 'voiceTtsVoice',
+    'voiceLang', 'voiceAutoSpeak', 'voiceAutoSend',
   ]
   for (const key of keys) {
     const v = body[key]
