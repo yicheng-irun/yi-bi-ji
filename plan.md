@@ -65,27 +65,28 @@ AI的所有变更，增加一个变更日志表，来专门存，后面可以进
 - AI 回复朗读：MessageList 每条 AI 消息加「朗读」按钮 + 自动朗读开关
 - 语音对话模式系统提示词：转写可能不准，指令含糊/关键词可疑（数字、专有名词、笔记名）时先追问澄清再行动；回复短句、口语化、易朗读
 
-## 技术选型（本地 CPU 优先）
-- ASR：Qwen3-ASR（0.6B / 1.7B），用社区 GGUF + llama.cpp 加速；i7 8 核跑 1.7B Q4（约 1GB）短句约 1~3s，0.6B 更快
-- 注意：Qwen3-ASR 只做识别不含 TTS（TTS 是 Qwen3-TTS，生成式 vocoder，CPU 慢）；朗读先用 piper（离线）/ edge-tts（在线免费、中文音质好），Qwen3-TTS 留待有 GPU 再上
-- 模型下载走 ModelScope（本机 HF 被墙），models/ 目录 .gitignore，不提交模型
+## 技术选型（云优先，本地兜底）
+- ASR 首选：**阿里云 DashScope（百炼）**，模型 `qwen3-asr-flash` / `qwen-audio-3.0-asr-flash`（流式）；长录音用 `-filetrans` 异步版本；OpenAI 兼容调用（`compatible-mode/v1/chat/completions`，OpenAI SDK 官方示例），与现有技术栈契合
+- TTS 首选：DashScope **CosyVoice / Qwen3-TTS**，中文音质天花板，走 DashScope 原生 API；只需一个 `DASHSCOPE_API_KEY`
+- 备选经典阿里云智能语音（NLS）：一句话识别 + 语音合成，自家 SDK，需适配层
+- 本地兜底（可选，后补）：Qwen3-ASR（0.6B/1.7B）社区 GGUF + llama.cpp，i7 8 核跑 1.7B Q4（约 1GB）短句约 1~3s；模型下载走 ModelScope（HF 被墙），models/ 目录 .gitignore
+- 注意：Qwen3-ASR 只做识别不含 TTS（TTS 是 Qwen3-TTS）；本地朗读也可用 piper（离线）/ edge-tts（在线）
 
-## 架构
-- apps/voice/：独立 Python 服务（FastAPI），绑 0.0.0.0 局域网可达，OpenAI 兼容接口
-  - POST /v1/audio/transcriptions — STT
-  - POST /v1/audio/speech — TTS（可后续接 piper / edge-tts / Qwen3-TTS）
-  - GET /health — 连通性探测
-  - 薄 package.json 包装 pnpm 脚本（download-model / start / dev，内部 spawn uvicorn），模式同 apps/opencode-mcp
-- bi-ji server：新增 /api/voice/transcribe 代理转发（浏览器只连 bi-ji，免 CORS；本机/局域网统一走设置里的 URL）
-- 设置页：新增「语音」分类，app_settings 存 voice* 键（voiceAsrUrl / voiceTtsUrl / 语言 / 自动朗读开关 / 推按松开发送 vs 先填入编辑 / 可选 Bearer token）；URL 为空则前端隐藏麦克风按钮，填了即启用
+## 架构（语音后端可切换）
+- bi-ji server：新增 `/api/voice/transcribe`、`/api/voice/speech` 代理，背后接「语音后端」抽象，支持切换：
+  1. **aliyun**（DashScope，默认首选）— 直接调 compatible-mode / 原生语音 API
+  2. **local**（apps/voice 本地 GGUF 服务，可选）
+  3. **custom**（任意 OpenAI 兼容 audio 端点）
+- apps/voice/（仅本地兜底需要）：独立 Python 服务（FastAPI），绑 0.0.0.0，OpenAI 兼容接口（POST /v1/audio/transcriptions、POST /v1/audio/speech、GET /health）；薄 package.json 包装 pnpm 脚本（download-model / start / dev），模式同 apps/opencode-mcp
+- 设置页：新增「语音」分类，app_settings 存 voice* 键（voiceProvider=aliyun/local/custom、voiceAsrUrl、voiceTtsUrl、voiceApiKey、语言、自动朗读开关、推按松开发送 vs 先填入编辑、可选 Bearer token）；未配置则前端隐藏麦克风按钮
 - 前端：
   - ChatInput 加麦克风按钮：onPointerDown 开始录音（MediaRecorder）、onPointerUp 停止并发送
   - MessageList 加朗读按钮 + 自动朗读
   - 语音消息带 inputMethod:'voice'，服务端据此注入语音模式系统提示词段落
 
 ## 待办
-- [ ] apps/voice Python 服务骨架 + OpenAI 兼容 STT/TTS 接口 + /health
-- [ ] ModelScope 模型下载脚本 + models/ 进 .gitignore
-- [ ] bi-ji /api/voice/transcribe 代理 + 设置页「语音」配置（voice* 键）
+- [ ] bi-ji /api/voice/transcribe、/api/voice/speech 代理 + aliyun（DashScope）后端实现
+- [ ] 设置页「语音」分类（voice* 键 + voiceProvider 切换）
 - [ ] ChatInput 推按说话 + MessageList 朗读按钮
 - [ ] agent 系统提示词注入语音对话模式
+- [ ] （可选）apps/voice 本地 GGUF 后端 + ModelScope 下载脚本 + models/ 进 .gitignore
