@@ -92,8 +92,10 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   useEffect(() => {
     refreshContext(threadId)
-    if (!threadId) { setMessages([]); return }
+    // 流式进行中不清空/不拉取：新建会话发出首条消息后 threadId 会从 '' 变为新 id，此时消息正在流入
     if (streamingRef.current) return
+    if (!threadId) { setMessages([]); return }
+    setMessages([])
     api.getMessages(threadId).then((res) => {
       if (streamingRef.current) return
       setMessages(res.messages)

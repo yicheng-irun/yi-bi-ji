@@ -129,7 +129,6 @@ export default function ConversationsPage() {
           )}
         </ChatHeader>
         <ChatPanel
-          key={activeId || 'new'}
           threadId={activeId}
           onThreadCreated={(t) => {
             setThreads((ts) => [t, ...ts])
