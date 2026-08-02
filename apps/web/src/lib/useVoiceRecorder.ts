@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export const TARGET_SAMPLE_RATE = 16000
+/** 最短有效时长（秒）与最小峰值幅度，低于则视为没说话 */
+export const MIN_DURATION = 0.25
+export const MIN_PEAK = 0.01
 
 function resampleLinear(samples: Float32Array, from: number, to: number): Float32Array {
   if (from === to) return samples
@@ -45,14 +48,21 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
-/** 把 MediaRecorder 产出的 blob（webm/ogg 等）解码后重编码为 16kHz 单声道 WAV */
-async function blobToWav(blob: Blob): Promise<Blob> {
+/** 把 MediaRecorder 产出的 blob（webm/ogg 等）解码后判断是否有效语音，有则重编码为 16kHz 单声道 WAV，静音/过短返回 null */
+async function blobToWavIfSpeech(blob: Blob): Promise<Blob | null> {
   const buf = await blob.arrayBuffer()
   const ctx = new AudioContext()
   try {
     const decoded = await ctx.decodeAudioData(buf)
     const samples = decoded.getChannelData(0)
     const rate = decoded.sampleRate
+    if (samples.length / rate < MIN_DURATION) return null
+    let peak = 0
+    for (let i = 0; i < samples.length; i++) {
+      const a = Math.abs(samples[i])
+      if (a > peak) peak = a
+    }
+    if (peak < MIN_PEAK) return null
     const final = rate === TARGET_SAMPLE_RATE ? samples : resampleLinear(samples, rate, TARGET_SAMPLE_RATE)
     return encodeWav(final, TARGET_SAMPLE_RATE)
   } finally {
@@ -91,7 +101,7 @@ export function useVoiceRecorder() {
     }
   }, [])
 
-  const stop = useCallback((): Promise<Blob> => {
+  const stop = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve, reject) => {
       const recorder = recorderRef.current
       const stream = streamRef.current
@@ -107,7 +117,7 @@ export function useVoiceRecorder() {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
         chunksRef.current = []
-        void blobToWav(blob)
+        void blobToWavIfSpeech(blob)
           .then(resolve)
           .catch((e) => reject(e as Error))
       }

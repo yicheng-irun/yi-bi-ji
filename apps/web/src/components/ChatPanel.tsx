@@ -68,7 +68,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
       .catch(() => {})
   }
 
-  const { messages, sendMessage, setMessages, status, error } = useChat({
+  const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
     transport,
     onFinish: ({ message }) => {
       refreshContext(threadIdRef.current)
@@ -112,7 +112,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   return (
     <>
-      <MessageList messages={messages} streaming={streaming} status={status} error={error} />
+      <MessageList messages={messages} streaming={streaming} status={status} error={error} onRetry={() => void regenerate()} />
       {contextInfo && (
         <ContextBar>
           上下文 ~{contextInfo.estimatedTokens >= 1000

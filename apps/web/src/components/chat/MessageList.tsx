@@ -171,14 +171,21 @@ function MessageItem({ message }: { message: UIMessage }) {
   )
 }
 
+const RetryBtn = styled.button`
+  background: none; border: none; padding: 0; margin-left: 6px;
+  font-size: 13px; color: var(--accent); cursor: pointer; text-decoration: underline;
+  &:hover { opacity: .8; }
+`
+
 interface MessageListProps {
   messages: UIMessage[]
   streaming: boolean
   status: ChatStatus
   error?: Error | null
+  onRetry?: () => void
 }
 
-export function MessageList({ messages, streaming, status, error }: MessageListProps) {
+export function MessageList({ messages, streaming, status, error, onRetry }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -199,6 +206,7 @@ export function MessageList({ messages, streaming, status, error }: MessageListP
       {status === 'error' && (
         <p style={{ color: 'var(--red)', fontSize: 13, textAlign: 'center' }}>
           [错误] {error?.message ?? '请求失败'}
+          {onRetry && <RetryBtn onClick={onRetry}>重试</RetryBtn>}
         </p>
       )}
       {messages.length === 0 && !streaming && (

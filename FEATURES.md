@@ -55,7 +55,7 @@
   - 跨网段 / NAT 场景：两台电脑互相访问不到时可用 SSH 隧道（`ssh -R 9222:127.0.0.1:9222`，由浏览器所在电脑发起，Linux 端只需访问 `127.0.0.1:9222`，无需开防火墙与监听），完整文档见 `docs/browser-cdp-ssh.md`，设置页教程中也给出了入口提示
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表（含 `set_note_tags`）
 - AI 修改记录页 `/ai-logs`（顶部导航「AI 记录」）：列出 `ai_change_logs`，按笔记/动作筛选、分页加载；每条记录展示动作徽标、笔记标题、摘要、前后字符数与时间，点击展开查看 before→after 的行级 diff（`GET /api/ai-logs`、`GET /api/ai-logs/:id`）；支持单条删除（展开后 🗑）与清空（`DELETE /api/ai-logs/:id`、`DELETE /api/ai-logs`，清空可限定当前筛选条件）
-- 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片
+- 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片；请求失败（如大模型服务繁忙）时错误提示旁附「重试」文字按钮，调用 `useChat` 的 `regenerate()` 重发最后一条消息
 - 支持展示 AI 的推理/思考过程：reasoning 内容以可折叠的「💭 思考过程」卡片呈现（带字数统计），流式过程中高亮并标注「思考过程…」，默认展开，点击标题可折叠/展开
 - AI 回复正文按 markdown 渲染（`apps/web/src/components/chat/ChatMarkdown.tsx`，`marked`），针对窄侧边栏做紧凑化：标题缩到与正文接近（h1≈1.1em、h2≈1.05em、h3+≈1em）、去除标题下划线，代码块/表格横向滚动（`overflow-x: auto`）并限制最大宽度，`overflow-wrap/word-break` 防止长内容撑破气泡
 - 工具调用卡片可点击展开/收起（`MessageList.tsx` 的 `ToolCard`）：默认收起为工具名小条，展开后展示入参 JSON、执行结果（文本/JSON/子代理过程）与错误信息；子代理运行中自动展开以实时展示进度，普通工具保持收起
@@ -63,7 +63,7 @@
 
 ## 语音对话
 
-- 语音输入（推按说话）：`ChatInput` 麦克风按钮，`onPointerDown` 开始录音（`AudioContext` 采集 PCM，重采样到 16kHz 单声道并编码为 WAV）、`onPointerUp` 松开即转文字发送（`apps/web/src/lib/useVoiceRecorder.ts`）
+- 语音输入（推按说话）：`ChatInput` 麦克风按钮，按下录音（`MediaRecorder` 采集），录音中浮层提示「松开发送 · 上滑取消」；**上滑超过阈值（60px）进入取消态（按钮变深红、浮层变「松开取消」），松开即丢弃不发送**；松开后先解码判断是否有有效语音（时长 ≥0.25s 且峰值幅度 ≥0.01，静音/没说话不调用识别），再转文字（`apps/web/src/lib/useVoiceRecorder.ts`）；`pointercancel` 系统打断静默丢弃，`handlingRef` 防 pointerup/pointercancel 连发重复处理
 - 默认「松开即发送」（`voiceAutoSend`），可配置为「转文字填入输入框待编辑」
 - ASR 走阿里云百炼 DashScope：`POST {voiceAsrUrl}/chat/completions`（OpenAI 兼容，`model=qwen3-asr-flash`，`input_audio` 传 WAV data URI），由 `apps/server/src/services/voice.ts` 实现；`apps/server/src/routes/voice.ts` 提供 `POST /api/voice/transcribe`（浏览器上传音频 blob）、`POST /api/voice/speech`（文字合成 MP3）、`POST /api/voice/test`
 - AI 回复朗读：`MessageList` 每条 AI 回复带「🔊 朗读」按钮（只读正文文本部分，跳过工具卡片/思考过程）；TTS 走 DashScope 非实时语音合成（`.../api/v1/services/audio/tts/SpeechSynthesizer`，模型如 `qwen-audio-3.0-tts-flash`/`cosyvoice-v2`，返回 JSON 中的 `output.audio.url` 再下载音频），`apps/web/src/lib/tts.ts` 负责播放与停止
