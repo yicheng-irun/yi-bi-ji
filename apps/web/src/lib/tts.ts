@@ -1,11 +1,26 @@
 import { api } from '../api/client'
 import { isTextUIPart, type UIMessage } from 'ai'
 
+/**
+ * 从一段文本中提取朗读片段：优先取 AI 用 ```朗读 代码块标记的内容（可多个），
+ * 没有标记时回退为整段文本。
+ */
+export function extractSpeakSegments(text: string): string[] {
+  const segs: string[] = []
+  const re = /```朗读[^\S\n]*\n?([\s\S]*?)```/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text))) {
+    const s = m[1].trim()
+    if (s) segs.push(s)
+  }
+  return segs.length > 0 ? segs : [text]
+}
+
 /** 提取消息中可朗读的文本（只取正文文本部分，跳过工具卡片/思考过程） */
 export function extractSpeakableText(message: UIMessage): string {
   return message.parts
     .filter((p) => isTextUIPart(p) && p.text)
-    .map((p) => (p as { text: string }).text)
+    .flatMap((p) => extractSpeakSegments((p as { text: string }).text))
     .join('\n')
 }
 

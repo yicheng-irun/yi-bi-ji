@@ -5,7 +5,7 @@ import styled from 'styled-components'
 import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCardBox, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
-import { extractSpeakableText, speakText } from '../../lib/tts'
+import { extractSpeakSegments, speakText } from '../../lib/tts'
 
 const SpeakBtn = styled.button`
   align-self: flex-start;
@@ -105,6 +105,26 @@ function ToolCard({ part }: { part: ToolPart }) {
   )
 }
 
+function SpeakButton({ text }: { text: string }) {
+  const [speaking, setSpeaking] = useState(false)
+  const speak = async () => {
+    if (!text.trim()) return
+    setSpeaking(true)
+    try {
+      await speakText(text)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSpeaking(false)
+    }
+  }
+  return (
+    <SpeakBtn onClick={() => void speak()} disabled={speaking}>
+      {speaking ? '…' : '🔊'} 朗读
+    </SpeakBtn>
+  )
+}
+
 function MessageParts({ message }: { message: UIMessage }): ReactNode {
   const nodes: ReactNode[] = []
   let textBuf = ''
@@ -114,11 +134,14 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
     const t = textBuf
     textBuf = ''
     if (message.role === 'assistant') {
+      const idx = tbIndex++
       nodes.push(
-        <MarkdownBubble key={`t-${tbIndex++}`} $role={message.role}>
+        <MarkdownBubble key={`t-${idx}`} $role={message.role}>
           <ChatMarkdown content={t} />
         </MarkdownBubble>,
       )
+      const speak = extractSpeakSegments(t).join('\n').trim()
+      if (speak) nodes.push(<SpeakButton key={`sp-${idx}`} text={speak} />)
     } else {
       nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
     }
@@ -152,29 +175,11 @@ function isEmptyAssistant(m: UIMessage): boolean {
 }
 
 function MessageItem({ message, onRetry }: { message: UIMessage; onRetry?: () => void }) {
-  const speakable = extractSpeakableText(message).trim()
-  const [speaking, setSpeaking] = useState(false)
-  const speak = async () => {
-    if (!speakable) return
-    setSpeaking(true)
-    try {
-      await speakText(speakable)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSpeaking(false)
-    }
-  }
   return (
     <MessageRow $role={message.role}>
       <Avatar $role={message.role}>{roleAvatars[message.role] ?? '?'}</Avatar>
       <MessageContent $role={message.role}>
         <MessageParts message={message} />
-        {message.role === 'assistant' && speakable && (
-          <SpeakBtn onClick={() => void speak()} disabled={speaking}>
-            {speaking ? '…' : '🔊'} 朗读
-          </SpeakBtn>
-        )}
         {onRetry && (
           <p style={{ color: 'var(--red)', fontSize: 13, margin: '4px 0 0' }}>
             [生成中断]

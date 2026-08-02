@@ -52,9 +52,14 @@ const Body = styled.div`
   a { color: var(--accent); overflow-wrap: break-word; }
 `
 
+/** ```朗读 代码块是 AI 标记朗读内容的约定，展示时去掉围栏按普通段落渲染 */
+function unwrapSpeakFences(content: string): string {
+  return content.replace(/```朗读[^\S\n]*\n?([\s\S]*?)```/g, (_, inner: string) => inner.trim())
+}
+
 export function ChatMarkdown({ content }: { content: string }) {
   const html = useMemo(
-    () => marked.parse(content || '', { async: false }) as string,
+    () => marked.parse(unwrapSpeakFences(content || ''), { async: false }) as string,
     [content],
   )
   return <Body dangerouslySetInnerHTML={{ __html: html }} />
