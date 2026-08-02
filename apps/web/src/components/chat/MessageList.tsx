@@ -6,7 +6,7 @@ import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCar
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
 import { SpeakButton } from './SpeakButton'
-import { extractSpeakSegments } from '../../lib/tts'
+import { markedSpeakSegments } from '../../lib/tts'
 
 interface SubagentMessage {
   parts?: UIMessage['parts']
@@ -111,8 +111,9 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
           <ChatMarkdown content={t} />
         </MarkdownBubble>,
       )
-      const speak = extractSpeakSegments(t).join('\n').trim()
-      if (speak) nodes.push(<SpeakButton key={`sp-${idx}`} text={speak} />)
+      if (markedSpeakSegments(t).length === 0 && t.trim()) {
+        nodes.push(<SpeakButton key={`sp-${idx}`} text={t.trim()} />)
+      }
     } else {
       nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
     }
