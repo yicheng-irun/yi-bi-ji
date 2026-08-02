@@ -1,10 +1,24 @@
 import { ToolLoopAgent, isStepCount } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { ChatThread } from '../db/models.js'
+import { Op } from 'sequelize'
+import { ChatThread, Note } from '../db/models.js'
 import { parseThreadMetadata } from '../services/chat.js'
 import { getSettings } from '../services/settings.js'
 import { createNoteTools, parseEnabledTools } from './tools.js'
 import { loadMcpToolsCached, parseMcpServers } from './mcp.js'
+
+/** 名为 AGENTS.md 的笔记作为固定指令注入系统提示词；重名取 id 最小的 */
+async function loadAgentsNote(): Promise<string | null> {
+  const note = await Note.findOne({
+    where: {
+      deletedAt: null,
+      [Op.or]: [{ draftTitle: 'AGENTS.md' }, { committedTitle: 'AGENTS.md' }],
+    },
+    order: [['id', 'ASC']],
+  })
+  const content = (note?.draftContent ?? note?.committedContent ?? '').trim()
+  return content || null
+}
 
 export async function createNoteAgent(threadId: string, opts: { voiceMode?: boolean } = {}) {
   const s = getSettings()
@@ -16,6 +30,7 @@ export async function createNoteAgent(threadId: string, opts: { voiceMode?: bool
     typeof originNoteId === 'number'
       ? `当前对话与笔记 id=${originNoteId} 关联（用户是在这篇笔记的上下文里开启的对话），优先基于它工作。`
       : '当前是全局对话，没有固定关联的笔记，按用户提问自行查找相关笔记。'
+  const agentsNote = await loadAgentsNote()
   const provider = createOpenAICompatible({
     name: 'custom',
     baseURL: s.aiBaseURL,
@@ -29,6 +44,7 @@ export async function createNoteAgent(threadId: string, opts: { voiceMode?: bool
     model: provider(s.aiModel),
     providerOptions,
     instructions: `你是一个笔记系统的 AI 助手。用户通过网页编辑器管理 markdown 笔记，你可以在侧边栏与用户对话。
+${agentsNote ? `\n以下是用户的固定指令（来自笔记《AGENTS.md》，始终遵循）：\n\n${agentsNote}\n` : ''}
 
 你可以使用的工具：
 - list_notes / search_notes：浏览和搜索库里的笔记

@@ -32,6 +32,7 @@
 ## AI 助手
 
 - 右侧侧边栏，与当前正在编辑的笔记联动；会话按创建时的笔记关联（`originNoteId`），该笔记 id 通过系统提示注入 Agent，全局对话则无固定关联笔记
+- 名为 `AGENTS.md` 的笔记作为固定指令注入系统提示词（类似 opencode 对项目根目录 AGENTS.md 的处理）：创建 agent 时读取其草稿内容追加到 instructions（空内容跳过，软删除不算），重名时取 id 最小的那篇
 - 对话支持多线程，在 `/conversations` 页面可审计历史会话
 - AI SDK v7 `ToolLoopAgent`（OpenAI 兼容端点），提供以下工具：
   - `list_notes` — 列出所有笔记
