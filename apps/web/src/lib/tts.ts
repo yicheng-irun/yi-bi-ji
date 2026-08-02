@@ -1,10 +1,10 @@
 import { api } from '../api/client'
 import { isTextUIPart, type UIMessage } from 'ai'
 
-/** 只取 ```朗读 代码块标记的内容（可多个），没有标记返回空数组 */
+/** 只取 ```朗读 代码块标记的内容（可多个），没有标记返回空数组；未闭合的块按渲染规则取到文末 */
 export function markedSpeakSegments(text: string): string[] {
   const segs: string[] = []
-  const re = /```朗读[^\S\n]*\n?([\s\S]*?)```/g
+  const re = /```朗读[^\S\n]*\n?([\s\S]*?)(?:```|$)/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text))) {
     const s = m[1].trim()

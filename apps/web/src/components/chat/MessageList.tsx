@@ -5,8 +5,6 @@ import styled from 'styled-components'
 import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCardBox, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
-import { SpeakButton } from './SpeakButton'
-import { markedSpeakSegments } from '../../lib/tts'
 
 interface SubagentMessage {
   parts?: UIMessage['parts']
@@ -105,15 +103,11 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
     const t = textBuf
     textBuf = ''
     if (message.role === 'assistant') {
-      const idx = tbIndex++
       nodes.push(
-        <MarkdownBubble key={`t-${idx}`} $role={message.role}>
+        <MarkdownBubble key={`t-${tbIndex++}`} $role={message.role}>
           <ChatMarkdown content={t} />
         </MarkdownBubble>,
       )
-      if (markedSpeakSegments(t).length === 0 && t.trim()) {
-        nodes.push(<SpeakButton key={`sp-${idx}`} text={t.trim()} />)
-      }
     } else {
       nodes.push(<Bubble key={`t-${tbIndex++}`} $role={message.role}>{t}</Bubble>)
     }

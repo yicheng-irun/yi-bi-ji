@@ -79,7 +79,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
       if (autoSpeakTimer.current) clearTimeout(autoSpeakTimer.current)
       autoSpeakTimer.current = setTimeout(() => {
         autoSpeakTimer.current = null
-        void speakText(text).catch(() => {})
+        void speakText(text).catch((e) => console.error('自动朗读失败', e))
       }, 600)
     },
     onError: (e) => console.error(e),
