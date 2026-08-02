@@ -56,7 +56,7 @@
   - 跨网段 / NAT 场景：两台电脑互相访问不到时可用 SSH 隧道（`ssh -R 9222:127.0.0.1:9222`，由浏览器所在电脑发起，Linux 端只需访问 `127.0.0.1:9222`，无需开防火墙与监听），完整文档见 `docs/browser-cdp-ssh.md`，设置页教程中也给出了入口提示
 - AI 的所有修改只改 draft，不落正式库，同时写入 `ai_change_logs` 审计表（含 `set_note_tags`）
 - AI 修改记录页 `/ai-logs`（顶部导航「AI 记录」）：列出 `ai_change_logs`，按笔记/动作筛选、分页加载；每条记录展示动作徽标、笔记标题、摘要、前后字符数与时间，点击展开查看 before→after 的行级 diff（`GET /api/ai-logs`、`GET /api/ai-logs/:id`）；支持单条删除（展开后 🗑）与清空（`DELETE /api/ai-logs/:id`、`DELETE /api/ai-logs`，清空可限定当前筛选条件）
-- 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片；请求失败（如大模型服务繁忙）时错误提示旁附「重试」文字按钮，调用 `useChat` 的 `regenerate()` 重发最后一条消息；失败会落库一条空的 assistant 消息，刷新后该空消息下方同样显示「重试」，服务端识别重发（消息 id 已存在）时先删除其后的残留消息再重新生成，避免空消息与重复消息留在历史里
+- 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片；长会话流式性能：`useChat` 开 `throttle: 75` 限制渲染频率、`MessageItem` 用 `React.memo`（SDK 只对流式中的消息做 structuredClone，历史消息引用不变整条跳过渲染）、流式期间滚动用即时定位（smooth 动画堆积会卡顿）；请求失败（如大模型服务繁忙）时错误提示旁附「重试」文字按钮，调用 `useChat` 的 `regenerate()` 重发最后一条消息；失败会落库一条空的 assistant 消息，刷新后该空消息下方同样显示「重试」，服务端识别重发（消息 id 已存在）时先删除其后的残留消息再重新生成，避免空消息与重复消息留在历史里
 - 支持展示 AI 的推理/思考过程：reasoning 内容以可折叠的「💭 思考过程」卡片呈现（带字数统计），流式过程中高亮并标注「思考过程…」，默认展开，点击标题可折叠/展开
 - AI 回复正文按 markdown 渲染（`apps/web/src/components/chat/ChatMarkdown.tsx`，`react-markdown` + remark-gfm + remark-breaks，组件级自定义渲染；` ```朗读 ` 代码块渲染为高亮片段并内联 🔊 朗读按钮），针对窄侧边栏做紧凑化：标题缩到与正文接近（h1≈1.1em、h2≈1.05em、h3+≈1em）、去除标题下划线，代码块/表格横向滚动（`overflow-x: auto`）并限制最大宽度，`overflow-wrap/word-break` 防止长内容撑破气泡
 - 工具调用卡片可点击展开/收起（`MessageList.tsx` 的 `ToolCard`）：默认收起为工具名小条，展开后展示入参 JSON、执行结果（文本/JSON/子代理过程）与错误信息；子代理运行中自动展开以实时展示进度，普通工具保持收起

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { api, type Thread } from '../api/client'
@@ -71,6 +71,8 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   const { messages, sendMessage, setMessages, regenerate, status, error } = useChat({
     transport,
+    // 流式更新节流：消息列表长时，每个 text-delta 都全量渲染会把页面卡死
+    throttle: 75,
     onFinish: ({ message }) => {
       refreshContext(threadIdRef.current)
       window.dispatchEvent(new CustomEvent('biji:chat-finish'))
@@ -90,6 +92,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   const streaming = status === 'submitted' || status === 'streaming'
   const streamingRef = useRef(streaming)
   streamingRef.current = streaming
+  const retry = useCallback(() => void regenerate(), [regenerate])
 
   useEffect(() => {
     refreshContext(threadId)
@@ -116,7 +119,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   return (
     <>
-      <MessageList messages={messages} streaming={streaming} status={status} error={error} onRetry={() => void regenerate()} />
+      <MessageList messages={messages} streaming={streaming} status={status} error={error} onRetry={retry} />
       {contextInfo && (
         <ContextBar>
           上下文 ~{contextInfo.estimatedTokens >= 1000

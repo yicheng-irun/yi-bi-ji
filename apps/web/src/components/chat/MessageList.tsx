@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatStatus, UIMessage } from 'ai'
 import { getToolName, isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
 import styled from 'styled-components'
@@ -140,7 +140,8 @@ function isEmptyAssistant(m: UIMessage): boolean {
   )
 }
 
-function MessageItem({ message, onRetry }: { message: UIMessage; onRetry?: () => void }) {
+// memo：流式期间只有最后一条消息的对象会变，历史消息整条跳过渲染
+const MessageItem = memo(function MessageItem({ message, onRetry }: { message: UIMessage; onRetry?: () => void }) {
   return (
     <MessageRow $role={message.role}>
       <Avatar $role={message.role}>{roleAvatars[message.role] ?? '?'}</Avatar>
@@ -155,7 +156,7 @@ function MessageItem({ message, onRetry }: { message: UIMessage; onRetry?: () =>
       </MessageContent>
     </MessageRow>
   )
-}
+})
 
 const RetryBtn = styled.button`
   background: none; border: none; padding: 0; margin-left: 6px;
@@ -175,8 +176,9 @@ export function MessageList({ messages, streaming, status, error, onRetry }: Mes
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // 流式期间用即时滚动（smooth 会堆积大量动画导致卡顿），结束后恢复平滑
+    bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' })
+  }, [messages, streaming])
 
   return (
     <Messages>
