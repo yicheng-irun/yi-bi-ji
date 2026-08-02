@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
-import { marked } from 'marked'
+import { isValidElement, type ReactNode } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import styled from 'styled-components'
-
-marked.setOptions({ gfm: true, breaks: true })
+import { SpeakButton } from './SpeakButton'
 
 const Body = styled.div`
   font-size: 14px; line-height: 1.6; color: var(--text);
@@ -52,15 +53,57 @@ const Body = styled.div`
   a { color: var(--accent); overflow-wrap: break-word; }
 `
 
-/** ```朗读 代码块是 AI 标记朗读内容的约定，展示时去掉围栏按普通段落渲染 */
-function unwrapSpeakFences(content: string): string {
-  return content.replace(/```朗读[^\S\n]*\n?([\s\S]*?)```/g, (_, inner: string) => inner.trim())
+const SpeakBlockBox = styled.div`
+  margin: .5em 0; padding: 8px 12px;
+  background: var(--accent-light); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  .text { white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+`
+
+/** ```朗读 代码块渲染成高亮片段 + 内联朗读按钮 */
+function SpeakBlock({ text }: { text: string }) {
+  return (
+    <SpeakBlockBox>
+      <div className="text">{text}</div>
+      <SpeakButton text={text} />
+    </SpeakBlockBox>
+  )
+}
+
+function isSpeakCode(node: ReactNode): boolean {
+  return (
+    isValidElement(node) &&
+    /language-朗读/.test(String((node.props as { className?: string }).className ?? ''))
+  )
 }
 
 export function ChatMarkdown({ content }: { content: string }) {
-  const html = useMemo(
-    () => marked.parse(unwrapSpeakFences(content || ''), { async: false }) as string,
-    [content],
+  return (
+    <Body>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          code({ node, className, children, ...props }) {
+            const lang = /language-(\S+)/.exec(className ?? '')?.[1]
+            if (lang === '朗读') {
+              return <SpeakBlock text={String(children).replace(/\n$/, '')} />
+            }
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            )
+          },
+          pre({ node, children, ...props }) {
+            const child = Array.isArray(children) ? children[0] : children
+            if (isSpeakCode(child)) return <>{child}</>
+            return <pre {...props}>{children}</pre>
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </Body>
   )
-  return <Body dangerouslySetInnerHTML={{ __html: html }} />
 }

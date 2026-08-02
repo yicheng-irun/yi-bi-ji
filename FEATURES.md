@@ -57,7 +57,7 @@
 - AI 修改记录页 `/ai-logs`（顶部导航「AI 记录」）：列出 `ai_change_logs`，按笔记/动作筛选、分页加载；每条记录展示动作徽标、笔记标题、摘要、前后字符数与时间，点击展开查看 before→after 的行级 diff（`GET /api/ai-logs`、`GET /api/ai-logs/:id`）；支持单条删除（展开后 🗑）与清空（`DELETE /api/ai-logs/:id`、`DELETE /api/ai-logs`，清空可限定当前筛选条件）
 - 流式输出使用 AI SDK UI Message Stream 协议（`createAgentUIStreamResponse`），前端 `@ai-sdk/react` 的 `useChat` 实时渲染文本增量与工具调用卡片；请求失败（如大模型服务繁忙）时错误提示旁附「重试」文字按钮，调用 `useChat` 的 `regenerate()` 重发最后一条消息；失败会落库一条空的 assistant 消息，刷新后该空消息下方同样显示「重试」，服务端识别重发（消息 id 已存在）时先删除其后的残留消息再重新生成，避免空消息与重复消息留在历史里
 - 支持展示 AI 的推理/思考过程：reasoning 内容以可折叠的「💭 思考过程」卡片呈现（带字数统计），流式过程中高亮并标注「思考过程…」，默认展开，点击标题可折叠/展开
-- AI 回复正文按 markdown 渲染（`apps/web/src/components/chat/ChatMarkdown.tsx`，`marked`），针对窄侧边栏做紧凑化：标题缩到与正文接近（h1≈1.1em、h2≈1.05em、h3+≈1em）、去除标题下划线，代码块/表格横向滚动（`overflow-x: auto`）并限制最大宽度，`overflow-wrap/word-break` 防止长内容撑破气泡
+- AI 回复正文按 markdown 渲染（`apps/web/src/components/chat/ChatMarkdown.tsx`，`react-markdown` + remark-gfm + remark-breaks，组件级自定义渲染；` ```朗读 ` 代码块渲染为高亮片段并内联 🔊 朗读按钮），针对窄侧边栏做紧凑化：标题缩到与正文接近（h1≈1.1em、h2≈1.05em、h3+≈1em）、去除标题下划线，代码块/表格横向滚动（`overflow-x: auto`）并限制最大宽度，`overflow-wrap/word-break` 防止长内容撑破气泡
 - 工具调用卡片可点击展开/收起（`MessageList.tsx` 的 `ToolCard`）：默认收起为工具名小条，展开后展示入参 JSON、执行结果（文本/JSON/子代理过程）与错误信息；子代理运行中自动展开以实时展示进度，普通工具保持收起
 - 自定义下拉选择组件 `Select`（`apps/web/src/ui/Select.tsx`）：替代原生 `<select>`，自绘 SVG 箭头图标，菜单为自绘浮层（点击外部/Esc 关闭、方向键 + Enter 选择、悬停高亮），用于 AI 侧边栏顶部的会话切换下拉
 
@@ -66,7 +66,7 @@
 - 语音输入（推按说话）：`ChatInput` 麦克风按钮，按下录音（`MediaRecorder` 采集），录音中浮层提示「松开发送 · 上滑取消」；**上滑超过阈值（60px）进入取消态（按钮变深红、浮层变「松开取消」），松开即丢弃不发送**；松开后先解码判断是否有有效语音（时长 ≥0.25s 且峰值幅度 ≥0.01，静音/没说话不调用识别），再转文字（`apps/web/src/lib/useVoiceRecorder.ts`）；`pointercancel` 系统打断静默丢弃，`handlingRef` 防 pointerup/pointercancel 连发重复处理
 - 默认「松开即发送」（`voiceAutoSend`），可配置为「转文字填入输入框待编辑」
 - ASR 走阿里云百炼 DashScope：`POST {voiceAsrUrl}/chat/completions`（OpenAI 兼容，`model=qwen3-asr-flash`，`input_audio` 传 WAV data URI），由 `apps/server/src/services/voice.ts` 实现；`apps/server/src/routes/voice.ts` 提供 `POST /api/voice/transcribe`（浏览器上传音频 blob）、`POST /api/voice/speech`（文字合成 MP3）、`POST /api/voice/test`
-- AI 回复朗读：`MessageList` 每个 AI 文本气泡各带一个「🔊 朗读」按钮，按气泡分开朗读（跳过工具卡片/思考过程）；朗读内容优先取 AI 用 ` ```朗读 ` 代码块标记的部分（系统提示词约定，块内纯口语短句，展示时围栏被剥掉按普通段落渲染），未标记时回退读整段文本；TTS 走 DashScope 非实时语音合成（`.../api/v1/services/audio/tts/SpeechSynthesizer`，模型如 `qwen-audio-3.0-tts-flash`/`cosyvoice-v2`，返回 JSON 中的 `output.audio.url` 再下载音频），`apps/web/src/lib/tts.ts` 负责播放与停止
+- AI 回复朗读：`MessageList` 每个 AI 文本气泡各带一个「🔊 朗读」按钮，按气泡分开朗读（跳过工具卡片/思考过程）；朗读内容优先取 AI 用 ` ```朗读 ` 代码块标记的部分（系统提示词约定，块内纯口语短句，渲染为高亮片段 + 内联朗读按钮），未标记时回退读整段文本；TTS 走 DashScope 非实时语音合成（`.../api/v1/services/audio/tts/SpeechSynthesizer`，模型如 `qwen-audio-3.0-tts-flash`/`cosyvoice-v2`，返回 JSON 中的 `output.audio.url` 再下载音频），`apps/web/src/lib/tts.ts` 负责播放与停止
 - 朗读缓存两级：服务端按「文本+模型+音色」哈希落盘 `dataDir/voice-cache/*.mp3`（同内容只调一次合成 API，避免重复计费）；前端会话内内存缓存（同文本再次朗读零请求，LRU 上限 60 条）
 - 自动朗读开关（`voiceAutoSpeak`）：AI 流式回复结束后自动朗读最终回复（用 600ms 防抖只朗读最后一条 assistant 消息，避免 agent 按步骤产生的中间消息被读出）
 - 语音模式系统提示词：语音消息通过 `sendMessage({ metadata: { inputMethod: 'voice' } })` 标记，服务端 `chat.ts` 识别后给 agent 注入「语音转写可能不准，指令含糊/关键词可疑先追问澄清再执行、回复短句口语化」的规则

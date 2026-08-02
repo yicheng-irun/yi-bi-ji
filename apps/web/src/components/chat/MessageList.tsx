@@ -5,17 +5,8 @@ import styled from 'styled-components'
 import { Avatar, Messages, Bubble, MarkdownBubble, Thinking, ToolCard as ToolCardBox, SubagentBlock, MessageRow, MessageContent, toolNames, roleAvatars } from './styles'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ChatMarkdown } from './ChatMarkdown'
-import { extractSpeakSegments, speakText } from '../../lib/tts'
-
-const SpeakBtn = styled.button`
-  align-self: flex-start;
-  display: flex; align-items: center; gap: 4px;
-  font-size: 11px; color: var(--text-muted);
-  border: 1px solid var(--border); border-radius: 6px;
-  background: var(--bg-card); padding: 3px 8px; cursor: pointer;
-  &:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
-  &:disabled { opacity: .5; cursor: not-allowed; }
-`
+import { SpeakButton } from './SpeakButton'
+import { extractSpeakSegments } from '../../lib/tts'
 
 interface SubagentMessage {
   parts?: UIMessage['parts']
@@ -102,26 +93,6 @@ function ToolCard({ part }: { part: ToolPart }) {
         </div>
       )}
     </ToolCardBox>
-  )
-}
-
-function SpeakButton({ text }: { text: string }) {
-  const [speaking, setSpeaking] = useState(false)
-  const speak = async () => {
-    if (!text.trim()) return
-    setSpeaking(true)
-    try {
-      await speakText(text)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSpeaking(false)
-    }
-  }
-  return (
-    <SpeakBtn onClick={() => void speak()} disabled={speaking}>
-      {speaking ? '…' : '🔊'} 朗读
-    </SpeakBtn>
   )
 }
 

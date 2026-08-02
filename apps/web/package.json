@@ -10,10 +10,13 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.45",
     "ai": "^7.0.42",
-    "marked": "latest",
+    "marked": "^18.0.7",
     "react": "latest",
     "react-dom": "latest",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "latest",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "styled-components": "latest"
   },
   "devDependencies": {
