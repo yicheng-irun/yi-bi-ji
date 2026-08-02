@@ -142,7 +142,16 @@ function MessageParts({ message }: { message: UIMessage }): ReactNode {
   return <>{nodes}</>
 }
 
-function MessageItem({ message }: { message: UIMessage }) {
+function isEmptyAssistant(m: UIMessage): boolean {
+  return (
+    m.role === 'assistant' &&
+    !m.parts.some(
+      (p) => (isTextUIPart(p) && !!p.text) || (isReasoningUIPart(p) && !!p.text) || isToolUIPart(p),
+    )
+  )
+}
+
+function MessageItem({ message, onRetry }: { message: UIMessage; onRetry?: () => void }) {
   const speakable = extractSpeakableText(message).trim()
   const [speaking, setSpeaking] = useState(false)
   const speak = async () => {
@@ -165,6 +174,12 @@ function MessageItem({ message }: { message: UIMessage }) {
           <SpeakBtn onClick={() => void speak()} disabled={speaking}>
             {speaking ? '…' : '🔊'} 朗读
           </SpeakBtn>
+        )}
+        {onRetry && (
+          <p style={{ color: 'var(--red)', fontSize: 13, margin: '4px 0 0' }}>
+            [生成中断]
+            <RetryBtn onClick={onRetry}>重试</RetryBtn>
+          </p>
         )}
       </MessageContent>
     </MessageRow>
@@ -194,8 +209,16 @@ export function MessageList({ messages, streaming, status, error, onRetry }: Mes
 
   return (
     <Messages>
-      {messages.map((m) => (
-        <MessageItem key={m.id} message={m} />
+      {messages.map((m, i) => (
+        <MessageItem
+          key={m.id}
+          message={m}
+          onRetry={
+            onRetry && !streaming && status !== 'error' && i === messages.length - 1 && isEmptyAssistant(m)
+              ? onRetry
+              : undefined
+          }
+        />
       ))}
       {streaming && (
         <Thinking>

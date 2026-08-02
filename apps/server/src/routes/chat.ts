@@ -67,9 +67,21 @@ chatRoutes.post('/threads/:id/stream', async (c) => {
   const md = newMessage.metadata
   const voiceMode = !!md && typeof md === 'object' && (md as Record<string, unknown>).inputMethod === 'voice'
 
-  const history = (await loadHistory(threadId)).slice(-MAX_CONTEXT_MESSAGES)
-  const knownIds = new Set(history.map((m) => m.id))
-  const uiMessages = [...history, newMessage]
+  const full = await loadHistory(threadId)
+  const knownIds = new Set(full.map((m) => m.id))
+  const retryIdx = full.findIndex((m) => m.id === newMessage.id)
+  let base: UIMessage[]
+  if (retryIdx >= 0) {
+    const removed = full.slice(retryIdx + 1)
+    if (removed.length > 0) {
+      await ChatMessage.destroy({ where: { threadId, id: removed.map((m) => m.id) } })
+        .catch((err) => console.error('delete retried messages failed', err))
+    }
+    base = full.slice(0, retryIdx + 1)
+  } else {
+    base = [...full, newMessage]
+  }
+  const uiMessages = base.slice(-MAX_CONTEXT_MESSAGES)
 
   const agent = await createNoteAgent(threadId, { voiceMode })
   type AgentUIMessage = InferAgentUIMessage<typeof agent>
