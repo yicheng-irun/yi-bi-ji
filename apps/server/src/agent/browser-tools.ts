@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { cdpClick, cdpType, listCdpTabs, navigateCdpPage, readCdpPage, screenshotCdpPage } from '../services/cdp.js'
+import { cdpClick, cdpEvaluate, cdpType, listCdpTabs, navigateCdpPage, readCdpPage, screenshotCdpPage } from '../services/cdp.js'
 
 const tabIndex = z.coerce
   .number()
@@ -74,6 +74,17 @@ export function createBrowserTools() {
         index: tabIndex,
       }),
       execute: async ({ selector, text, index }) => cdpType({ selector, text, index }),
+    }),
+
+    browser_eval: tool({
+      description:
+        '在本机浏览器当前活动标签页执行一段 JavaScript 并返回结果（Promise 会自动等待）。适合滚动页面（如 window.scrollTo(0, document.body.scrollHeight)）、读取/修改 DOM、填复杂表单等 browser_read/browser_click/browser_type 覆盖不到的操作。脚本会真实作用于页面，仅在用户明确要求操作浏览器时使用；不要写死循环，默认 10 秒超时（最大 30 秒），结果截断到 4000 字符。',
+      inputSchema: z.object({
+        js: z.string().describe('要执行的 JS：表达式或 (() => { ...; return 值 })() / (async () => {...})()，返回值作为结果'),
+        index: tabIndex,
+        timeout: z.coerce.number().optional().describe('超时毫秒数，默认 10000，范围 1000~30000'),
+      }),
+      execute: async ({ js, index, timeout }) => cdpEvaluate({ js, index, timeout }),
     }),
   }
 }

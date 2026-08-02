@@ -9,7 +9,7 @@ import { createBrowserTools } from './browser-tools.js'
 import { createResearchSubagent } from './subagents.js'/** 主代理全部可用工具（含联网与深度调研） */
 export const MAIN_AGENT_TOOLS = [
   'web_search', 'web_fetch', 'deep_research',
-  'browser_tabs', 'browser_read', 'browser_screenshot', 'browser_navigate', 'browser_click', 'browser_type',
+  'browser_tabs', 'browser_read', 'browser_screenshot', 'browser_navigate', 'browser_click', 'browser_type', 'browser_eval',
   'list_notes', 'search_notes', 'read_note', 'create_note', 'set_note_tags',
   'write_note', 'replace_in_note', 'insert_block', 'delete_note',
 ] as const

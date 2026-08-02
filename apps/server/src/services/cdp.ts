@@ -316,6 +316,44 @@ export async function cdpClick(args: { selector?: string; text?: string; index?:
   }
 }
 
+export interface EvalResult {
+  ok: boolean
+  result?: string
+  reason?: string
+}
+
+/** 在页面里执行一段 JS 并返回结果（Promise 自动等待）。超时只是放弃等待返回，无法中断页面里已卡死的脚本 */
+export async function cdpEvaluate(args: { js: string; index?: number; timeout?: number }): Promise<EvalResult> {
+  try {
+    const js = args.js.trim()
+    if (!js) return { ok: false, reason: 'js 不能为空' }
+    if (js.length > 8000) return { ok: false, reason: `js 太长（${js.length} 字符，上限 8000）` }
+    const browser = await getCdpBrowser()
+    const page = await pickPage(browser, args.index)
+    const timeout = Math.min(Math.max(args.timeout ?? 10000, 1000), 30000)
+    const value = await Promise.race([
+      page.evaluate(js),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`执行超时（${timeout}ms），脚本仍在页面里运行，请避免死循环`)), timeout),
+      ),
+    ])
+    let result: string
+    if (value === undefined) {
+      result = '(无返回值)'
+    } else {
+      try {
+        result = typeof value === 'string' ? value : JSON.stringify(value)
+      } catch {
+        result = String(value)
+      }
+    }
+    if (result.length > 4000) result = `${result.slice(0, 4000)}…（共 ${result.length} 字符，已截断）`
+    return { ok: true, result }
+  } catch (e) {
+    return { ok: false, reason: cdpError(e) }
+  }
+}
+
 export interface TypeResult {
   ok: boolean
   reason?: string

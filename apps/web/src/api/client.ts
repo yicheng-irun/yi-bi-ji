@@ -302,6 +302,7 @@ export const AGENT_TOOLS: AgentToolInfo[] = [
   { name: 'browser_navigate', label: '浏览器·跳转', hint: '让浏览器跳转/新开网页', requires: 'cdp' },
   { name: 'browser_click', label: '浏览器·点击', hint: '点击页面元素（真实操作）', requires: 'cdp' },
   { name: 'browser_type', label: '浏览器·输入', hint: '在输入框中输入文字（真实操作）', requires: 'cdp' },
+  { name: 'browser_eval', label: '浏览器·执行 JS', hint: '在页面里执行 JavaScript（滚动/DOM 等，真实操作）', requires: 'cdp' },
   { name: 'list_notes', label: '列出笔记', hint: '概览库中所有笔记' },
   { name: 'search_notes', label: '搜索笔记', hint: '按关键词模糊搜索笔记' },
   { name: 'read_note', label: '读取笔记', hint: '读取笔记草稿内容（支持行范围）' },
