@@ -24,9 +24,13 @@ export function extractSpeakableText(message: UIMessage): string {
 interface Current {
   audio: HTMLAudioElement
   url: string
+  /** 结束播放并 resolve 等待中的 Promise（停止/自然结束/出错共用） */
+  finish: () => void
 }
 
 let current: Current | null = null
+/** 代数计数：每次停止/新朗读都递增，慢合成返回后若已被取代则放弃播放（防双音频并发） */
+let epoch = 0
 
 /** 会话内内存缓存：同一段文本的合成音频只请求一次（对象 URL），LRU 上限避免内存膨胀 */
 const urlCache = new Map<string, string>()
@@ -58,38 +62,63 @@ function cleanup() {
   current = null
 }
 
-/** 停止当前朗读（如果有） */
-export function stopSpeech() {
-  if (current) {
-    current.audio.pause()
-    cleanup()
-  }
+/** 全局朗读状态：正在朗读（含合成等待中）的文本，驱动所有朗读按钮的 ⏹/🔊 显示 */
+let playingText: string | null = null
+type Listener = () => void
+const listeners = new Set<Listener>()
+
+function setPlaying(text: string | null) {
+  playingText = text
+  listeners.forEach((l) => l())
 }
 
-/** 朗读文字：优先用缓存，否则调用 /api/voice/speech 合成 MP3 并播放，Promise 在播放结束时 resolve。 */
+export function subscribeSpeech(l: Listener): () => void {
+  listeners.add(l)
+  return () => { listeners.delete(l) }
+}
+
+export function getPlayingText(): string | null {
+  return playingText
+}
+
+/** 停止当前朗读（如果有），等待中的 speakText Promise 一并 resolve */
+export function stopSpeech() {
+  epoch++
+  setPlaying(null)
+  current?.finish()
+}
+
+/** 朗读文字：优先用缓存，否则调用 /api/voice/speech 合成 MP3 并播放，Promise 在播放结束或被停止时 resolve。 */
 export async function speakText(text: string): Promise<void> {
   stopSpeech()
+  const my = epoch
+  setPlaying(text)
   let url = cachedUrl(text)
   if (!url) {
-    const blob = await api.speech(text)
+    let blob: Blob
+    try {
+      blob = await api.speech(text)
+    } catch (e) {
+      if (my === epoch) setPlaying(null)
+      throw e
+    }
+    if (my !== epoch) return
     url = URL.createObjectURL(blob)
     rememberUrl(text, url)
   }
   const audio = new Audio(url)
-  current = { audio, url }
   await new Promise<void>((resolve) => {
     const done = () => {
-      cleanup()
+      audio.pause()
+      if (current?.finish === done) {
+        cleanup()
+        setPlaying(null)
+      }
       resolve()
     }
+    current = { audio, url: url!, finish: done }
     audio.onended = done
-    audio.onerror = () => {
-      cleanup()
-      resolve()
-    }
-    audio.play().catch(() => {
-      cleanup()
-      resolve()
-    })
+    audio.onerror = done
+    audio.play().catch(done)
   })
 }

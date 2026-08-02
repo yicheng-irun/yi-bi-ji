@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback } from 'react'
+import { useSyncExternalStore } from 'react'
 import styled from 'styled-components'
-import { speakText } from '../../lib/tts'
+import { getPlayingText, speakText, stopSpeech, subscribeSpeech } from '../../lib/tts'
 
 export const SpeakBtn = styled.button`
   align-self: flex-start;
@@ -13,21 +14,17 @@ export const SpeakBtn = styled.button`
 `
 
 export function SpeakButton({ text }: { text: string }) {
-  const [speaking, setSpeaking] = useState(false)
-  const speak = async () => {
-    if (!text.trim()) return
-    setSpeaking(true)
-    try {
-      await speakText(text)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSpeaking(false)
-    }
-  }
-  return (
-    <SpeakBtn onClick={() => void speak()} disabled={speaking}>
-      {speaking ? '…' : '🔊'} 朗读
-    </SpeakBtn>
+  // 全局播放状态驱动：谁的文本在播（含自动朗读），谁就显示 ⏹ 停止
+  const speaking = useSyncExternalStore(
+    subscribeSpeech,
+    useCallback(() => getPlayingText() === text, [text]),
   )
+  const onClick = () => {
+    if (speaking) {
+      stopSpeech()
+      return
+    }
+    void speakText(text).catch((e) => console.error(e))
+  }
+  return <SpeakBtn onClick={onClick}>{speaking ? '⏹ 停止' : '🔊 朗读'}</SpeakBtn>
 }

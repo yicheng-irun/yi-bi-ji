@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type UIMessage } from 'ai'
 import { api, type Thread } from '../api/client'
 import { ContextBar } from './chat/styles'
 import { MessageList } from './chat/MessageList'
 import { ChatInput } from './chat/ChatInput'
-import { extractSpeakableText, speakText } from '../lib/tts'
+import { extractSpeakableText, getPlayingText, speakText, stopSpeech, subscribeSpeech } from '../lib/tts'
 
 interface ChatPanelProps {
   threadId: string
@@ -19,6 +19,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
   const [voiceEnabled, setVoiceEnabled] = useState(false)
   const [voiceAutoSend, setVoiceAutoSend] = useState(true)
   const [voiceAutoSpeak, setVoiceAutoSpeak] = useState(false)
+  const playingText = useSyncExternalStore(subscribeSpeech, getPlayingText)
 
   const threadIdRef = useRef(threadId)
   threadIdRef.current = threadId
@@ -121,6 +122,11 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
           上下文 ~{contextInfo.estimatedTokens >= 1000
             ? `${(contextInfo.estimatedTokens / 1000).toFixed(1)}k`
             : contextInfo.estimatedTokens} tokens · {contextInfo.messageCount} 条消息
+        </ContextBar>
+      )}
+      {playingText !== null && (
+        <ContextBar as="button" onClick={() => stopSpeech()} style={{ cursor: 'pointer', width: '100%', border: 'none' }}>
+          ⏹ 停止朗读
         </ContextBar>
       )}
       <ChatInput
