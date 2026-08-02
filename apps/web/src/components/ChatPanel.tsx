@@ -72,6 +72,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
     transport,
     onFinish: ({ message }) => {
       refreshContext(threadIdRef.current)
+      window.dispatchEvent(new CustomEvent('biji:chat-finish'))
       if (!voiceAutoSpeakRef.current || !message) return
       // agent 按步骤产出多条 assistant 消息，只朗读最终回复（用防抖只留最后一条）
       const text = extractSpeakableText(message)

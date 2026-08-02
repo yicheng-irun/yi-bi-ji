@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { api, CLIENT_ID, type Note } from '../../api/client'
+import { createEventStream } from '../../lib/events'
 import { Button } from '../../ui/Button'
 import { Loading } from '../../ui/Loading'
 import { ChatSidebar } from '../../components/ChatSidebar'
@@ -123,6 +124,8 @@ export default function NoteEditorPage() {
   const dirtyRef = useRef(false)
   const dirty = remote !== null && (title !== remote.draftTitle || content !== remote.draftContent)
   dirtyRef.current = dirty
+  const remoteRef = useRef<RemoteDraft | null>(null)
+  remoteRef.current = remote
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
@@ -153,9 +156,8 @@ export default function NoteEditorPage() {
   }, [noteId, showToast])
 
   useEffect(() => {
-    const es = new EventSource('/api/events')
-    es.addEventListener('note-updated', (e) => {
-      const evt = JSON.parse((e as MessageEvent).data) as RemoteDraft & { noteId: number; clientId?: string }
+    const onUpdated = (e: MessageEvent) => {
+      const evt = JSON.parse(e.data) as RemoteDraft & { noteId: number; clientId?: string }
       if (evt.noteId !== noteId) return
       // 自己保存动作产生的回声事件：本地状态已由保存请求的响应更新，直接忽略，
       // 避免 SSE 先于 HTTP 响应到达时误判为"远端有更新"
@@ -170,12 +172,28 @@ export default function NoteEditorPage() {
           return cur
         })
       }
-    })
-    es.addEventListener('note-committed', (e) => {
-      const evt = JSON.parse((e as MessageEvent).data) as { noteId: number }
+    }
+    const onCommitted = (e: MessageEvent) => {
+      const evt = JSON.parse(e.data) as { noteId: number }
       if (evt.noteId === noteId) api.getNote(noteId).then(setNote)
-    })
-    return () => es.close()
+    }
+    const stop = createEventStream({ 'note-updated': onUpdated, 'note-committed': onCommitted })
+
+    // AI 回复结束的兜底同步：SSE 断线时也能在对话结束后把 AI 的修改拉下来
+    const onChatFinish = () => {
+      if (dirtyRef.current) return
+      api.getNote(noteId).then((n) => {
+        const cur = remoteRef.current
+        if (cur && n.draftContentVersion === cur.draftContentVersion && n.draftTitleVersion === cur.draftTitleVersion) return
+        const next: RemoteDraft = { draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion }
+        setNote(n); setRemote(next); setTitle(next.draftTitle); setContent(next.draftContent); setPendingRemote(null)
+      }).catch(() => {})
+    }
+    window.addEventListener('biji:chat-finish', onChatFinish)
+    return () => {
+      stop()
+      window.removeEventListener('biji:chat-finish', onChatFinish)
+    }
   }, [noteId])
 
   const savingRef = useRef(false)

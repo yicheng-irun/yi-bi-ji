@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { api, type Note } from '../api/client'
+import { createEventStream } from '../lib/events'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Badge } from '../ui/Badge'
@@ -89,14 +90,16 @@ export default function NotesPage() {
       .finally(() => setLoading(false))
   useEffect(() => { void load() }, [])
 
-  useEffect(() => {
-    const es = new EventSource('/api/events')
-    es.addEventListener('note-created', load)
-    es.addEventListener('note-deleted', load)
-    es.addEventListener('note-committed', load)
-    es.addEventListener('note-updated', load)
-    return () => es.close()
-  }, [])
+  useEffect(
+    () =>
+      createEventStream({
+        'note-created': load,
+        'note-deleted': load,
+        'note-committed': load,
+        'note-updated': load,
+      }),
+    [],
+  )
 
   const create = async () => {
     const note = await api.createNote(title.trim() || '未命名')
