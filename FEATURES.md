@@ -3,8 +3,9 @@
 ## 笔记管理
 
 - 笔记列表：浏览、新建笔记（回车建）
-- markdown 纯文本编辑器（等宽字体），Ctrl+S 保存草稿
-- 编辑器三种视图模式（顶部导航栏插槽中，位于「隐藏 AI / 删除」按钮左侧的分段控件切换）：`编辑`（默认，纯 markdown 文本编辑）、`双列`（左编辑 + 右实时预览并排）、`预览`（纯 markdown 渲染预览，不含编辑器）；预览由 `marked` 渲染（`apps/web/src/components/MarkdownPreview.tsx`）
+- 列表页搜索框：按关键词模糊搜索标题 + 正文（`GET /api/notes/search?q=`，防抖 300ms，随笔记变更自动刷新结果），结果卡片显示命中片段（snippet）与「未提交/待确认删除」徽标，Esc 清空搜索
+- markdown 纯文本编辑器（等宽字体）：停止输入 1.5s 后自动静默保存草稿（Ctrl+S 手动保存仍可用；有远端冲突时暂停自动保存，状态栏显示「保存中…/未保存/已保存」）；有未保存修改时 `beforeunload` 拦截刷新/关闭
+- 编辑器三种视图模式（顶部导航栏插槽中，位于「隐藏 AI / 删除」按钮左侧的分段控件切换）：`编辑`（默认，纯 markdown 文本编辑）、`双列`（左编辑 + 右实时预览并排）、`预览`（纯 markdown 渲染预览，不含编辑器）；预览由 `marked` 渲染 + `DOMPurify` 消毒（防 AI 抓取内容注入 XSS）（`apps/web/src/components/MarkdownPreview.tsx`）
 - 浏览器标签页标题（`document.title`）随页面变化：笔记编辑页显示笔记标题（随输入实时更新），变更详情页显示「变更：xxx」，列表/变更/会话页显示对应页面名，格式为 `xxx - bi-ji`
 - 站点 favicon 为手绘 SVG（`apps/web/public/favicon.svg`）：靛蓝渐变圆角底 + 折角便签纸 + 铅笔，与应用主色一致
 - 删除笔记为两阶段：删除操作仅标记 `deletedAt`（待确认删除），需到变更页（`/changes`）「确认删除」后才真正落库删除；也可「撤销删除」恢复
@@ -16,7 +17,7 @@
 - 笔记同时存储 committed（正式）与 draft（草稿）两套标题、正文
 - 草稿内容/标题各自维护版本号（`draftContentVersion` / `draftTitleVersion`），每次修改递增
 - 保存草稿时携带 `baseVersion`，服务端校验如果和库中不一致返回 409 → 前端 toast 提示冲突
-- 全局 SSE（`/api/events`）实时广播草稿变更，编辑器在无本地未保存内容时自动同步远端变更；有本地修改时显示冲突条（「放弃本地并同步」/「用本地覆盖远端」）；服务端每 15s 发 `ping` 心跳防代理掐断空闲长连接，前端统一走 `lib/events.ts` 的 `createEventStream`（45s 无消息判定半开连接自动重连）；AI 回复结束（`biji:chat-finish` 事件）时编辑器兜底重新拉取笔记，SSE 断线期间 AI 的修改也能补上
+- 全局 SSE（`/api/events`）实时广播草稿变更：事件为瘦身载荷（只带 `noteId` + 标题 + 版本号，不含正文），前端收到后按需单条拉取——笔记列表增量 upsert/移除（不再全量重拉），编辑器在无本地未保存内容时自动同步远端变更，有本地修改时显示冲突条（「放弃本地并同步」/「用本地覆盖远端」）；服务端每 15s 发 `ping` 心跳防代理掐断空闲长连接，前端统一走 `lib/events.ts` 的 `createEventStream`（45s 无消息判定半开连接自动重连）；AI 回复结束（`biji:chat-finish` 事件）时编辑器兜底重新拉取笔记，SSE 断线期间 AI 的修改也能补上
 - 防自回环：前端每个页面实例持有随机 `CLIENT_ID`，保存草稿时随请求上送，`note-updated` 事件回带 `clientId`，编辑器忽略自己产生的回声事件（避免 SSE 先于 HTTP 响应到达时误报冲突）；保存请求进行中忽略重复触发（避免旧 base 版本造成假 409）
 - 提交（commit）将草稿写入正式：可提交整篇笔记（所有 hunk），也可在 diff 视图中仅接受部分 hunk 后提交重组后的内容
 - 支持单篇提交、全部提交、放弃全部变更（恢复为正式版）
@@ -113,7 +114,7 @@
 - 「思考强度」设置（reasoningEffort：不设置/低/中/高），默认「不设置」；通过 providerOptions `{ custom: { reasoningEffort } }` 下发给主代理与调研子代理，推理模型生效、普通模型自动忽略
 - Agent 能力设置：主代理（`aiTools`）与调研子代理（`aiSubagentTools`）可分别勾选可用工具（web_search/web_fetch/deep_research/browser_tabs/browser_read/browser_screenshot/browser_navigate/browser_click/browser_type/list_notes/search_notes/read_note/create_note/set_note_tags/write_note/replace_in_note/insert_block/delete_note，子代理不含 deep_research），默认全部勾选；保存为逗号分隔列表，`*` 表示全部，空串表示全部禁用；服务端按配置过滤实际挂载到 `ToolLoopAgent` 的工具，新对话生效；browser_* 工具带 `requires: 'cdp'` 标记，未启用浏览器控制时在设置页置灰不可勾选
 - 浏览器控制设置（`browserCdpEnabled` / `browserCdpUrl`，`browser_*` 工具与后端状态接口共用）：开关 + CDP 调试地址 + 「测试连接」（`POST /api/browser/test`，用页面填的地址试连并列出标签页）+ 「断开连接」+ 连接状态卡片（`GET /api/browser/status`）；内置使用教程，展示 `scripts/start-browser-cdp.bat` 完整内容（一键复制），分 Windows 端启动、跨机器（Linux 服务 + Windows 浏览器）网络配置、启用三步骤，并提示 CDP 局域网开放的安全风险
-- MCP 服务器设置（`mcpServers`，JSON 数组）：通过 MCP 协议把外部服务器的工具挂载给主代理与调研子代理，用于扩展 Agent 能力；设置页以「列表 + 弹窗编辑」方式配置（不再手写 JSON），每行可开关启用（`enabled` 字段，未启用不挂载工具），下方「工具预览」连接各服务器列出其提供的工具；每项含 `name`（唯一标识，也是工具名前缀）、`type`（http/sse/stdio）、`url`（http/sse 用）、`headers`（http/sse 可选）、`command/args/env`（stdio 用）；加载的工具以 `mcp__{服务器名}__{工具名}` 命名避免与内置工具冲突，配置不变时结果按配置签名缓存复用（不重连），连接失败的服务器跳过并记录错误
+- MCP 服务器设置（`mcpServers`，JSON 数组）：通过 MCP 协议把外部服务器的工具挂载给主代理与调研子代理，用于扩展 Agent 能力；设置页以「列表 + 弹窗编辑」方式配置（不再手写 JSON），每行可开关启用（`enabled` 字段，未启用不挂载工具），下方「工具预览」连接各服务器列出其提供的工具；每项含 `name`（唯一标识，也是工具名前缀）、`type`（http/sse/stdio）、`url`（http/sse 用）、`headers`（http/sse 可选）、`command/args/env`（stdio 用）；加载的工具以 `mcp__{服务器名}__{工具名}` 命名避免与内置工具冲突，配置不变时结果按配置签名缓存复用（不重连），配置变更时自动关闭上一批客户端（防 stdio 子进程/连接泄漏），同签名并发加载去重，连接失败的服务器跳过并记录错误
 - 「测试连接」按钮：`POST /api/settings/test` 用当前配置发一次最小请求验证连通性；`POST /api/mcp/test` 试连所有配置的 MCP 服务器并列出其可用工具
 
 ## OpenCode 集成（`apps/opencode-mcp`）

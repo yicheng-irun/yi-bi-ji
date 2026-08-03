@@ -127,10 +127,13 @@ export default function NoteEditorPage() {
   const remoteRef = useRef<RemoteDraft | null>(null)
   remoteRef.current = remote
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = useCallback((msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(msg)
-    setTimeout(() => setToast(''), 3000)
+    toastTimer.current = setTimeout(() => setToast(''), 3000)
   }, [])
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
   useEffect(() => {
     api.getNote(noteId).then((n) => {
@@ -156,38 +159,36 @@ export default function NoteEditorPage() {
   }, [noteId, showToast])
 
   useEffect(() => {
+    // 远端变更统一入口：SSE 事件只带 noteId + 版本号，内容按需拉取。
+    // 本地干净时直接套用远端草稿；有未保存修改时挂起冲突提示。
+    const applyRemote = (n: Note) => {
+      const next: RemoteDraft = { draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion }
+      setNote(n)
+      if (!dirtyRef.current) {
+        setRemote(next); setTitle(next.draftTitle); setContent(next.draftContent); setPendingRemote(null)
+      } else {
+        const cur = remoteRef.current
+        if (cur && next.draftContentVersion === cur.draftContentVersion && next.draftTitleVersion === cur.draftTitleVersion) return
+        setPendingRemote(next)
+      }
+    }
     const onUpdated = (e: MessageEvent) => {
-      const evt = JSON.parse(e.data) as RemoteDraft & { noteId: number; clientId?: string }
+      const evt = JSON.parse(e.data) as { noteId: number; clientId?: string }
       if (evt.noteId !== noteId) return
       // 自己保存动作产生的回声事件：本地状态已由保存请求的响应更新，直接忽略，
       // 避免 SSE 先于 HTTP 响应到达时误判为"远端有更新"
       if (evt.clientId === CLIENT_ID) return
-      const next: RemoteDraft = { draftTitle: evt.draftTitle, draftContent: evt.draftContent, draftContentVersion: evt.draftContentVersion, draftTitleVersion: evt.draftTitleVersion }
-      if (!dirtyRef.current) {
-        setRemote(next); setTitle(next.draftTitle); setContent(next.draftContent); setPendingRemote(null)
-      } else {
-        setRemote((cur) => {
-          if (cur && evt.draftContentVersion === cur.draftContentVersion && evt.draftTitleVersion === cur.draftTitleVersion) return cur
-          setPendingRemote(next)
-          return cur
-        })
-      }
+      api.getNote(noteId).then(applyRemote).catch(() => {})
     }
     const onCommitted = (e: MessageEvent) => {
       const evt = JSON.parse(e.data) as { noteId: number }
-      if (evt.noteId === noteId) api.getNote(noteId).then(setNote)
+      if (evt.noteId === noteId) api.getNote(noteId).then(setNote).catch(() => {})
     }
     const stop = createEventStream({ 'note-updated': onUpdated, 'note-committed': onCommitted })
 
     // AI 回复结束的兜底同步：SSE 断线时也能在对话结束后把 AI 的修改拉下来
     const onChatFinish = () => {
-      if (dirtyRef.current) return
-      api.getNote(noteId).then((n) => {
-        const cur = remoteRef.current
-        if (cur && n.draftContentVersion === cur.draftContentVersion && n.draftTitleVersion === cur.draftTitleVersion) return
-        const next: RemoteDraft = { draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion }
-        setNote(n); setRemote(next); setTitle(next.draftTitle); setContent(next.draftContent); setPendingRemote(null)
-      }).catch(() => {})
+      api.getNote(noteId).then(applyRemote).catch(() => {})
     }
     window.addEventListener('biji:chat-finish', onChatFinish)
     return () => {
@@ -197,13 +198,15 @@ export default function NoteEditorPage() {
   }, [noteId])
 
   const savingRef = useRef(false)
+  const [saving, setSaving] = useState(false)
 
-  const save = useCallback(async (base?: RemoteDraft) => {
+  const save = useCallback(async (base?: RemoteDraft, opts?: { silent?: boolean }) => {
     const r = base ?? remote
     if (!r) return
     // 上一次保存尚未返回时忽略本次触发，避免用旧 base 版本发起请求造成假冲突（409）
     if (savingRef.current) return
     savingRef.current = true
+    setSaving(true)
     try {
       const n = await api.saveDraft(noteId, {
         draftTitle: title, draftContent: content,
@@ -212,7 +215,7 @@ export default function NoteEditorPage() {
       setNote(n)
       setRemote({ draftTitle: n.draftTitle, draftContent: n.draftContent, draftContentVersion: n.draftContentVersion, draftTitleVersion: n.draftTitleVersion })
       setPendingRemote(null)
-      showToast('已保存')
+      if (!opts?.silent) showToast('已保存')
     } catch (err) {
       const e = err as { status?: number; body?: { note?: Note } }
       if (e.status === 409 && e.body?.note) {
@@ -224,6 +227,7 @@ export default function NoteEditorPage() {
       }
     } finally {
       savingRef.current = false
+      setSaving(false)
     }
   }, [noteId, remote, title, content, showToast])
 
@@ -234,6 +238,22 @@ export default function NoteEditorPage() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [save])
+
+  // 自动保存：停止输入 1.5s 后静默保存；有远端冲突时暂停，等用户处理
+  useEffect(() => {
+    if (!dirty || pendingRemote) return
+    const t = setTimeout(() => void save(undefined, { silent: true }), 1500)
+    return () => clearTimeout(t)
+  }, [dirty, pendingRemote, title, content, save])
+
+  // 有未保存修改时拦截刷新/关闭，防止误丢内容
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
 
   if (!note) return (
     <>
@@ -287,8 +307,8 @@ export default function NoteEditorPage() {
           />
           <span className="version">v{remote?.draftContentVersion ?? '-'}</span>
           <span className="status">
-            <span className="dot" style={{ background: dirty ? 'var(--orange)' : 'var(--green)' }} />
-            {dirty ? '未保存 (Ctrl+S)' : '已保存'}
+            <span className="dot" style={{ background: dirty || saving ? 'var(--orange)' : 'var(--green)' }} />
+            {saving ? '保存中…' : dirty ? '未保存' : '已保存'}
           </span>
           {note.hasChanges && (
             <Link className="link-diff" to={`/changes/${note.id}`}>

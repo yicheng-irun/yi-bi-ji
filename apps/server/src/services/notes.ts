@@ -92,6 +92,8 @@ export async function searchNotes(query: string, page = 1, perPage = 20) {
       title: n.draftTitle,
       updatedAt: n.updatedAt,
       snippet: makeSnippet(n.draftContent, query),
+      hasChanges: n.draftContent !== n.committedContent || n.draftTitle !== n.committedTitle,
+      deletedAt: n.deletedAt ?? null,
     })),
   }
 }
@@ -135,7 +137,6 @@ function emitNoteUpdated(note: Note, source: 'ai' | 'user', clientId?: string) {
     type: 'note-updated',
     noteId: note.id,
     draftTitle: note.draftTitle,
-    draftContent: note.draftContent,
     draftContentVersion: note.draftContentVersion,
     draftTitleVersion: note.draftTitleVersion,
     source,

@@ -4,7 +4,6 @@ export interface NoteUpdatedEvent {
   type: 'note-updated'
   noteId: number
   draftTitle: string
-  draftContent: string
   draftContentVersion: number
   draftTitleVersion: number
   source: 'ai' | 'user'

@@ -104,9 +104,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface SearchResultItem {
+  id: number
+  title: string
+  updatedAt: string
+  snippet: string
+  hasChanges: boolean
+  deletedAt: string | null
+}
+
 export const api = {
   listNotes: () => request<Note[]>('/api/notes'),
   getNote: (id: number) => request<Note>(`/api/notes/${id}`),
+  searchNotes: (q: string) =>
+    request<{ total: number; page: number; perPage: number; notes: SearchResultItem[] }>(
+      `/api/notes/search?q=${encodeURIComponent(q)}`,
+    ),
   createNote: (title: string) => request<Note>('/api/notes', { method: 'POST', body: JSON.stringify({ title }) }),
   deleteNote: (id: number) => request<Note>(`/api/notes/${id}`, { method: 'DELETE' }),
   saveDraft: (

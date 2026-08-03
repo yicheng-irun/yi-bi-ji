@@ -8,6 +8,7 @@ import {
   commitNote,
   deleteNote,
   updateNoteMeta,
+  searchNotes,
   ConflictError,
   NotFoundError,
 } from '../services/notes.js'
@@ -15,6 +16,12 @@ import {
 export const notesRoutes = new Hono()
 
 notesRoutes.get('/', async (c) => c.json(await listNotes()))
+
+notesRoutes.get('/search', async (c) => {
+  const q = c.req.query('q')?.trim() ?? ''
+  if (!q) return c.json({ total: 0, page: 1, perPage: 20, notes: [] })
+  return c.json(await searchNotes(q))
+})
 
 notesRoutes.post('/', async (c) => {
   const body = await c.req.json<{ title?: string; content?: string; tags?: string[] }>()

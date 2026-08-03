@@ -31,6 +31,18 @@ export async function runNotesTests() {
   const metaBack = await api(`/api/notes/${noteId}`)
   check('标签持久化', JSON.stringify((metaBack.body as { tags: string[] }).tags) === JSON.stringify(['学习', '决策']))
 
+  section('搜索')
+  const hit = await api<{ total: number; notes: { id: number; snippet: string }[] }>(
+    `/api/notes/search?q=${encodeURIComponent('b改')}`,
+  )
+  check('正文关键词命中', hit.status === 200 && hit.body.total >= 1 && hit.body.notes.some((n) => n.id === noteId))
+  const hitTitle = await api<{ total: number }>(`/api/notes/search?q=${encodeURIComponent('冒烟')}`)
+  check('标题关键词命中', hitTitle.status === 200 && hitTitle.body.total >= 1)
+  const miss = await api<{ total: number; notes: unknown[] }>(`/api/notes/search?q=${encodeURIComponent('不存在的关键词xyz')}`)
+  check('无命中返回空', miss.status === 200 && miss.body.total === 0 && miss.body.notes.length === 0)
+  const empty = await api<{ total: number }>('/api/notes/search?q=')
+  check('空关键词返回空', empty.status === 200 && empty.body.total === 0)
+
   const del = await api(`/api/notes/${noteId}`, { method: 'DELETE' })
   check('删除笔记', del.status === 200)
 }

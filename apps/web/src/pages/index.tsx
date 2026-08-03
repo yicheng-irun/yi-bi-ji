@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { api, type Note } from '../api/client'
+import { api, type Note, type SearchResultItem } from '../api/client'
 import { createEventStream } from '../lib/events'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -18,6 +18,11 @@ const Page = styled.div`
 const CreateBar = styled.div`
   display: flex; gap: 10px; align-items: center;
   .grow { flex: 1; min-width: 0; }
+`
+
+const Snippet = styled.div`
+  font-size: 12px; color: var(--text-secondary); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 `
 
 const Card = styled(Link)`
@@ -66,6 +71,9 @@ export default function NotesPage() {
   const [error, setError] = useState('')
   const [title, setTitle] = useState('')
   const [tag, setTag] = useState('')
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SearchResultItem[] | null>(null)
+  const [searchTotal, setSearchTotal] = useState(0)
   const navigate = useNavigate()
 
   const UNTAGGED = '__untagged__'
@@ -90,16 +98,40 @@ export default function NotesPage() {
       .finally(() => setLoading(false))
   useEffect(() => { void load() }, [])
 
-  useEffect(
-    () =>
-      createEventStream({
-        'note-created': load,
-        'note-deleted': load,
-        'note-committed': load,
-        'note-updated': load,
-      }),
-    [],
-  )
+  // 搜索结果随输入和底层笔记变化（防抖 300ms）
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) { setResults(null); return }
+    let cancelled = false
+    const t = setTimeout(() => {
+      api.searchNotes(q)
+        .then((r) => { if (!cancelled) { setResults(r.notes); setSearchTotal(r.total) } })
+        .catch(() => {})
+    }, 300)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [query, notes])
+
+  // SSE 增量更新：事件只带 noteId，按需单条拉取并插入到最新位置（列表按 updatedAt 倒序）
+  const upsert = useCallback((n: Note) => {
+    setNotes((cur) => [n, ...cur.filter((x) => x.id !== n.id)])
+  }, [])
+
+  useEffect(() => {
+    const fetchOne = (e: MessageEvent) => {
+      const evt = JSON.parse(e.data) as { noteId: number }
+      api.getNote(evt.noteId).then(upsert).catch(() => {})
+    }
+    const onDeleted = (e: MessageEvent) => {
+      const evt = JSON.parse(e.data) as { noteId: number }
+      setNotes((cur) => cur.filter((x) => x.id !== evt.noteId))
+    }
+    return createEventStream({
+      'note-created': fetchOne,
+      'note-updated': fetchOne,
+      'note-committed': fetchOne,
+      'note-deleted': onDeleted,
+    })
+  }, [upsert])
 
   const create = async () => {
     const note = await api.createNote(title.trim() || '未命名')
@@ -122,10 +154,43 @@ export default function NotesPage() {
         <Button size="lg" variant="primary" onClick={create}>新建笔记</Button>
       </CreateBar>
 
+      <Input
+        placeholder="搜索标题或正文…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+      />
+
       {loading && <Loading />}
       {error && !loading && <Empty title={error} />}
 
-      {!loading && !error && notes.length > 0 && (
+      {!loading && !error && results !== null && (
+        <>
+          <Count>搜索到 {searchTotal} 篇笔记{searchTotal > results.length ? `（显示前 ${results.length} 篇）` : ''}</Count>
+          {results.map((r) => (
+            <Card key={r.id} to={r.deletedAt ? `/changes/${r.id}` : `/notes/${r.id}`}>
+              <span className="icon">{r.deletedAt ? '🗑' : r.hasChanges ? '📄' : '📋'}</span>
+              <div className="info">
+                <div className="title" style={r.deletedAt ? { textDecoration: 'line-through', color: 'var(--text-secondary)' } : undefined}>
+                  {r.title || '(无标题)'}
+                </div>
+                <div className="meta">
+                  #{r.id}{' · '}{new Date(r.updatedAt).toLocaleString('zh-CN')}
+                </div>
+                {r.snippet && <Snippet>{r.snippet}</Snippet>}
+              </div>
+              <div className="actions">
+                {r.deletedAt
+                  ? <Badge variant="danger">待确认删除</Badge>
+                  : r.hasChanges && <Badge variant="warning">未提交</Badge>}
+              </div>
+            </Card>
+          ))}
+          {results.length === 0 && <Empty title={`没有匹配「${query.trim()}」的笔记`} />}
+        </>
+      )}
+
+      {!loading && !error && results === null && notes.length > 0 && (
         <ChipRow>
           <Chip $on={!tag} onClick={() => setTag('')}>
             全部<span className="n">{notes.length}</span>
@@ -143,9 +208,9 @@ export default function NotesPage() {
         </ChipRow>
       )}
 
-      {!loading && !error && visible.length > 0 && <Count>共 {visible.length} 篇笔记</Count>}
+      {!loading && !error && results === null && visible.length > 0 && <Count>共 {visible.length} 篇笔记</Count>}
 
-      {!loading && !error && visible.map((n) => (
+      {!loading && !error && results === null && visible.map((n) => (
         <Card key={n.id} to={n.deletedAt ? `/changes/${n.id}` : `/notes/${n.id}`}>
           <span className="icon">{n.deletedAt ? '🗑' : n.hasChanges ? '📄' : '📋'}</span>
           <div className="info">
@@ -171,10 +236,10 @@ export default function NotesPage() {
         </Card>
       ))}
 
-      {!loading && !error && notes.length === 0 && (
+      {!loading && !error && results === null && notes.length === 0 && (
         <Empty icon="📝" title="还没有笔记，在上方输入标题并回车创建第一篇" />
       )}
-      {!loading && !error && notes.length > 0 && visible.length === 0 && (
+      {!loading && !error && results === null && notes.length > 0 && visible.length === 0 && (
         <Empty title="当前过滤条件下没有笔记" />
       )}
     </Page>

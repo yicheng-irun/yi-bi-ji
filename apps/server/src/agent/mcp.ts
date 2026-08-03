@@ -114,17 +114,30 @@ export async function closeMcpClients(clients: MCPClient[]): Promise<void> {
 }
 
 let cache: { signature: string; loaded: LoadedMcp } | null = null
+let inflight: { signature: string; promise: Promise<LoadedMcp> } | null = null
 
 export function getMcpCacheKey(servers: McpServerConfig[]): string {
   return JSON.stringify(servers)
 }
 
-export async function loadMcpToolsCached(servers: McpServerConfig[]): Promise<LoadedMcp> {
+export function loadMcpToolsCached(servers: McpServerConfig[]): Promise<LoadedMcp> {
   const signature = getMcpCacheKey(servers)
-  if (cache && cache.signature === signature) return cache.loaded
-  const loaded = await loadMcpTools(servers)
-  cache = { signature, loaded }
-  return loaded
+  if (cache && cache.signature === signature) return Promise.resolve(cache.loaded)
+  if (inflight && inflight.signature === signature) return inflight.promise
+  const old = cache
+  cache = null
+  const promise = loadMcpTools(servers)
+    .then((loaded) => {
+      cache = { signature, loaded }
+      // 配置已变更：关闭上一批客户端，避免 stdio 子进程/连接泄漏
+      if (old) void closeMcpClients(old.loaded.clients)
+      return loaded
+    })
+    .finally(() => {
+      if (inflight?.promise === promise) inflight = null
+    })
+  inflight = { signature, promise }
+  return promise
 }
 
 export function clearMcpCache() {

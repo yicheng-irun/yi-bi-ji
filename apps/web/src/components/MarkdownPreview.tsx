@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import styled from 'styled-components'
 
 marked.setOptions({ gfm: true, breaks: true })
@@ -44,7 +45,7 @@ const Body = styled.div`
 
 export function MarkdownPreview({ content }: { content: string }) {
   const html = useMemo(
-    () => marked.parse(content || '', { async: false }) as string,
+    () => DOMPurify.sanitize(marked.parse(content || '', { async: false }) as string),
     [content],
   )
   return <Body className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
