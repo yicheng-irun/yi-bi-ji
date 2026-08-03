@@ -120,7 +120,7 @@ class BijiApi {
     }
 
     fun streamChat(base: String, threadId: String, message: String): Flow<ChatEvent> = callbackFlow {
-        val escaped = json.encodeToString(kotlinx.serialization.json.JsonPrimitive(message))
+        val escaped = kotlinx.serialization.json.JsonPrimitive(message).toString()
         val request = Request.Builder()
             .url(url(base, "/chat/threads/$threadId/stream"))
             .post("""{"message":$escaped}""".toRequestBody(jsonType))
