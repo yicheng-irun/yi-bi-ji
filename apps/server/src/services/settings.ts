@@ -1,5 +1,6 @@
 import { AppSetting } from '../db/models.js'
 import { env } from '../env.js'
+import { aliyunVoiceProfile, isVoiceEnabled, type VoiceProfile } from './voice-config.js'
 
 export interface Settings {
   aiBaseURL: string
@@ -23,10 +24,14 @@ export interface Settings {
   backupUser: string
   backupPassword: string
   backupDatabase: string
-  /** 语音服务：后端类型（aliyun=阿里云百炼 DashScope，默认） */
+  /** 语音服务：后端类型（aliyun=阿里云百炼 DashScope；已被 voiceProfiles 取代，仅旧库兼容读取） */
   voiceProvider: string
-  /** 语音服务：API Key（DashScope 的 DASHSCOPE_API_KEY） */
-  voiceApiKey: string
+  /** 语音服务：配置档案列表 JSON（VoiceProfile[]，每份含 name + 可选 apiKey + asr/tts 端点配置） */
+  voiceProfiles: string
+  /** 语音服务：当前激活的档案名 */
+  voiceActiveProfile: string
+  /** 语音服务：ASR 是否可用（计算字段，不落库），'1' 可用 */
+  voiceEnabled: string
   /** 语音服务：ASR 接口地址（OpenAI 兼容 chat/completions 的 base，如 DashScope compatible-mode） */
   voiceAsrUrl: string
   /** 语音服务：ASR 模型名，如 qwen3-asr-flash */
@@ -50,10 +55,36 @@ const cache: Record<string, string> = {}
 export async function initSettingsCache() {
   const rows = await AppSetting.findAll()
   for (const r of rows) cache[r.key] = r.value
+  // 全局 voiceApiKey（含旧 .env VOICE_API_KEY）已废弃：挪入引用了 {{apiKey}} 但还没填 Key 的档案，随后删除
+  const legacyKey = (cache.voiceApiKey ?? process.env.VOICE_API_KEY ?? '').trim()
+  if (cache.voiceProfiles === undefined) {
+    // 旧库迁移：没有 voiceProfiles 时，把当前生效的百炼（旧 voice* 字段）配置推导成一份档案落库
+    const profile = aliyunVoiceProfile(getSettings())
+    if (legacyKey) profile.apiKey = legacyKey
+    await updateSettings({
+      voiceProfiles: JSON.stringify([profile], null, 2),
+      voiceActiveProfile: profile.name,
+    })
+  } else if (legacyKey) {
+    try {
+      const profiles = JSON.parse(cache.voiceProfiles) as VoiceProfile[]
+      let changed = false
+      for (const p of profiles) {
+        if (p && typeof p === 'object' && !p.apiKey?.trim() && JSON.stringify(p).includes('{{apiKey}}')) {
+          p.apiKey = legacyKey
+          changed = true
+        }
+      }
+      if (changed) await updateSettings({ voiceProfiles: JSON.stringify(profiles, null, 2) })
+    } catch {
+      /* 非法 JSON 跳过 */
+    }
+  }
+  if (cache.voiceApiKey !== undefined) await clearSettingsKey('voiceApiKey')
 }
 
 export function getSettings(): Settings {
-  return {
+  const s: Omit<Settings, 'voiceEnabled'> = {
     aiBaseURL: cache.aiBaseURL ?? env.aiBaseURL,
     aiApiKey: cache.aiApiKey ?? env.aiApiKey,
     aiModel: cache.aiModel ?? env.aiModel,
@@ -71,7 +102,8 @@ export function getSettings(): Settings {
     backupPassword: cache.backupPassword ?? '',
     backupDatabase: cache.backupDatabase ?? '',
     voiceProvider: cache.voiceProvider ?? 'aliyun',
-    voiceApiKey: cache.voiceApiKey ?? env.voiceApiKey ?? '',
+    voiceProfiles: cache.voiceProfiles ?? '',
+    voiceActiveProfile: cache.voiceActiveProfile ?? '',
     voiceAsrUrl:
       cache.voiceAsrUrl ??
       (env.voiceWorkspaceId
@@ -89,6 +121,7 @@ export function getSettings(): Settings {
     voiceAutoSpeak: cache.voiceAutoSpeak ?? '0',
     voiceAutoSend: cache.voiceAutoSend ?? '1',
   }
+  return { ...s, voiceEnabled: isVoiceEnabled(s as Settings) ? '1' : '0' }
 }
 
 export async function updateSettings(partial: Partial<Settings>) {

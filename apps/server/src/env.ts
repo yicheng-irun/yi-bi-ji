@@ -17,6 +17,5 @@ export const env = {
   dataDir: path.resolve(process.env.DATA_DIR ?? path.join(process.cwd(), 'data')),
   browserHeadless: process.env.BROWSER_HEADLESS !== 'false' && process.env.BROWSER_HEADLESS !== '0',
   browserCdpUrl: process.env.BROWSER_CDP_URL ?? '',
-  voiceApiKey: process.env.VOICE_API_KEY ?? '',
   voiceWorkspaceId: process.env.WORKSPACE_ID ?? '',
 }

@@ -33,7 +33,7 @@ export function ChatPanel({ threadId, currentNoteId, onThreadCreated }: ChatPane
 
   useEffect(() => {
     api.getSettings().then((s) => {
-      setVoiceEnabled(!!s.voiceApiKey.trim())
+      setVoiceEnabled(s.voiceEnabled === '1')
       setVoiceAutoSend(s.voiceAutoSend !== '0')
       setVoiceAutoSpeak(s.voiceAutoSpeak === '1')
     }).catch(() => {})

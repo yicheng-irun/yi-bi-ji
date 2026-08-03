@@ -66,13 +66,14 @@
 
 - 语音输入（推按说话）：`ChatInput` 麦克风按钮，按下录音（`MediaRecorder` 采集），录音中浮层提示「松开发送 · 上滑取消」；**上滑超过阈值（60px）进入取消态（按钮变深红、浮层变「松开取消」），松开即丢弃不发送**；松开后先解码判断是否有有效语音（时长 ≥0.25s 且峰值幅度 ≥0.01，静音/没说话不调用识别），再转文字（`apps/web/src/lib/useVoiceRecorder.ts`）；`pointercancel` 系统打断静默丢弃，`handlingRef` 防 pointerup/pointercancel 连发重复处理
 - 默认「松开即发送」（`voiceAutoSend`），可配置为「转文字填入输入框待编辑」
-- ASR 走阿里云百炼 DashScope：`POST {voiceAsrUrl}/chat/completions`（OpenAI 兼容，`model=qwen3-asr-flash`，`input_audio` 传 WAV data URI），由 `apps/server/src/services/voice.ts` 实现；`apps/server/src/routes/voice.ts` 提供 `POST /api/voice/transcribe`（浏览器上传音频 blob）、`POST /api/voice/speech`（文字合成 MP3）、`POST /api/voice/test`
-- AI 回复朗读：AI 用 ` ```朗读 ` 代码块标记要朗读的内容（系统提示词约定，块内纯口语短句；提取时容忍未闭合的块，按渲染规则取到文末），渲染为高亮片段 + 内联 🔊 朗读按钮——只有朗读块能朗读，气泡级朗读按钮已移除；播放状态全局可订阅（`tts.ts` 的 `subscribeSpeech`/`getPlayingText` + `useSyncExternalStore`），谁的文本在播（含自动朗读）谁的按钮就显示「⏹ 停止」，点击即停；TTS 走 DashScope 非实时语音合成（`.../api/v1/services/audio/tts/SpeechSynthesizer`，模型如 `qwen-audio-3.0-tts-flash`/`cosyvoice-v2`，返回 JSON 中的 `output.audio.url` 再下载音频），`apps/web/src/lib/tts.ts` 负责播放与停止
-- 朗读缓存两级：服务端按「文本+模型+音色」哈希落盘 `dataDir/voice-cache/*.mp3`（同内容只调一次合成 API，避免重复计费）；前端会话内内存缓存（同文本再次朗读零请求，LRU 上限 60 条）
+- ASR/TTS 走「语音配置档案」通用 HTTP 适配器（`apps/server/src/services/voice-config.ts` 定义结构、`services/voice.ts` 执行）：不限接口路径与字段，ASR 支持 multipart 文件上传（自定义文件字段名 + 额外表单字段）或 JSON 请求体模板，识别文本按点路径（`textPath`）从响应取值（数组自动拼接各项 text）；TTS 请求体为 JSON 模板，响应支持 binary（直接是音频）或 json 按点路径（`audioPath`）取音频（值为 http(s) 地址则二次下载，否则按 base64 解码）；模板支持 `{{apiKey}}` `{{text}}` `{{audioBase64}}` `{{audioDataUri}}` `{{mimeType}}` 占位符，每端点可配 headers 与 timeoutMs；`apps/server/src/routes/voice.ts` 提供 `POST /api/voice/transcribe`（浏览器上传音频 blob；也接受 JSON 形式 `{audioBase64, mimeType, profile?}`）、`POST /api/voice/speech`（`{text, profile?}`）、`POST /api/voice/test`；两个接口的 `profile` 参数可指定一份档案覆盖激活档案（设置页测试用，此时 TTS 跳过磁盘缓存、真实调用）
+- 设置页「语音」含「接口测试」卡片：针对使用中的档案、按当前页面配置测试（未保存的改动也生效）——TTS 填一句文案「生成并播放」（可中途停止，显示音频大小）；ASR 支持「按住说话」录音识别（复用 `useVoiceRecorder`，静音/过短拦截）与「选择音频文件」上传识别，直接展示识别文本或错误
+- AI 回复朗读：AI 用 ` ```朗读 ` 代码块标记要朗读的内容（系统提示词约定，块内纯口语短句；提取时容忍未闭合的块，按渲染规则取到文末），渲染为高亮片段 + 内联 🔊 朗读按钮——只有朗读块能朗读，气泡级朗读按钮已移除；播放状态全局可订阅（`tts.ts` 的 `subscribeSpeech`/`getPlayingText` + `useSyncExternalStore`），谁的文本在播（含自动朗读）谁的按钮就显示「⏹ 停止」，点击即停；`apps/web/src/lib/tts.ts` 负责播放与停止
+- 朗读缓存两级：服务端按「文本+TTS 端点配置」哈希落盘 `dataDir/voice-cache/`（按内容类型定扩展名，同内容只调一次合成 API，避免重复计费）；前端会话内内存缓存（同文本再次朗读零请求，LRU 上限 60 条）
 - 自动朗读开关（`voiceAutoSpeak`）：AI 流式回复结束后自动朗读最终回复（用 600ms 防抖只朗读最后一条 assistant 消息，避免 agent 按步骤产生的中间消息被读出）；只朗读 ` ```朗读 ` 标记的内容，没有标记则不自动朗读；任何朗读播放期间输入框上方都显示「⏹ 停止朗读」条；`tts.ts` 全局单音频 + epoch 代数防并发（慢合成返回后若已被新朗读/停止取代则放弃播放），手动与自动朗读不会同时出声
 - 语音模式系统提示词：语音消息通过 `sendMessage({ metadata: { inputMethod: 'voice' } })` 标记，服务端 `chat.ts` 识别后给 agent 注入「语音转写可能不准，指令含糊/关键词可疑先追问澄清再执行、回复短句口语化」的规则
-- 设置页「语音」分类（`app_settings` 的 `voice*` 键）：`voiceProvider`（aliyun/custom）、`voiceApiKey`（也可用 `.env` 的 `VOICE_API_KEY`）、`voiceAsrUrl`/`voiceAsrModel`、`voiceTtsUrl`/`voiceTtsModel`/`voiceTtsVoice`、`voiceLang`、`voiceAutoSpeak`、`voiceAutoSend`；未配置 API Key 时聊天框不显示麦克风按钮
-- 百炼 2.0 工作空间账户：`.env` 配 `WORKSPACE_ID` 后自动推导 ASR/TTS 接口地址（`https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/...`），设置页保存的值优先
+- 设置页「语音」分类（`app_settings` 的 `voice*` 键）：`voiceProfiles`（配置档案列表 JSON，每份含 `name` + 可选 `apiKey` + `asr`/`tts` 端点配置）、`voiceActiveProfile`（使用中的档案名，落空时取第一份）、`voiceAutoSpeak`、`voiceAutoSend`；API Key 只存在各档案里（`{{apiKey}}` 占位符取本档案的 Key，如百炼/火山/腾讯各填各的），无鉴权服务不填；档案列表 + 弹窗编辑（表单 / 整段 JSON 两种方式，表单含名称、API Key、接口地址、请求方式、字段名/点路径、body 模板、headers、超时），弹窗内可一键填充预设（阿里云百炼 / 本地 ASR-TTS 服务）；服务端计算 `voiceEnabled`（激活档案 ASR 可用）下发，聊天框按此决定是否显示麦克风按钮
+- 旧库迁移：启动时若无 `voiceProfiles`，自动把当前生效的旧百炼字段（`voiceAsrUrl`/`voiceAsrModel`/`voiceTtsUrl`/`voiceTtsModel`/`voiceTtsVoice`/`voiceLang`，含 `WORKSPACE_ID` 推导的工作空间地址）转成「阿里云百炼」档案落库并激活；已废弃的全局 `voiceApiKey`（及旧 `.env` 的 `VOICE_API_KEY`）会在启动时挪入引用了 `{{apiKey}}` 但未填 Key 的档案，随后从设置中删除，行为与旧硬编码实现一致
 
 ## 前端组件库（`apps/web/src/ui/`）
 

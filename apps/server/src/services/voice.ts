@@ -3,124 +3,210 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getSettings } from './settings.js'
 import { env } from '../env.js'
+import {
+  getByPath,
+  profileAsrEndpoint,
+  profileTtsEndpoint,
+  renderTemplate,
+  resolveAsrEndpoint,
+  resolveTtsEndpoint,
+  VoiceError,
+  type VoiceAsrConfig,
+  type VoiceProfile,
+  type VoiceTtsConfig,
+  type VoiceVars,
+} from './voice-config.js'
 
-export class VoiceError extends Error {}
+export { VoiceError }
 
-interface DashScopeChoice {
-  message?: {
-    content?: string | Array<{ type?: string; text?: string }>
-  }
+const MIME_EXT: Record<string, string> = {
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/ogg': 'ogg',
+  'audio/webm': 'webm',
+  'audio/flac': 'flac',
+  'audio/aac': 'aac',
+  'audio/pcm': 'pcm',
 }
 
-function extractText(content: string | Array<{ type?: string; text?: string }> | undefined): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .filter((p) => p.type === 'text' && typeof p.text === 'string')
-      .map((p) => p.text as string)
+function extFromContentType(ct: string): string {
+  const base = ct.split(';')[0].trim().toLowerCase()
+  return MIME_EXT[base] ?? 'audio'
+}
+
+function audioVars(vars: VoiceVars): VoiceVars {
+  return vars
+}
+
+function baseHeaders(cfg: { headers?: Record<string, string> }, vars: VoiceVars): Record<string, string> {
+  return (renderTemplate(cfg.headers ?? {}, vars) ?? {}) as Record<string, string>
+}
+
+async function assertOk(res: Response, what: string): Promise<void> {
+  if (res.ok) return
+  const errText = (await res.text()).slice(0, 500)
+  throw new VoiceError(`${what}失败（${res.status}）：${errText}`)
+}
+
+function extractText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value
+      .map((p) => {
+        if (typeof p === 'string') return p
+        if (p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string') {
+          return (p as { text: string }).text
+        }
+        return ''
+      })
       .join('')
   }
   return ''
 }
 
-/** 语音识别：把音频（base64 + mime）转成文字。当前实现走阿里云百炼 DashScope OpenAI 兼容接口。 */
-export async function transcribeAudio(audioBase64: string, mimeType: string): Promise<string> {
-  const s = getSettings()
-  if (!s.voiceApiKey) throw new VoiceError('未配置语音 API Key（设置 → 语音）')
-  const base = s.voiceAsrUrl.replace(/\/+$/, '')
-  const dataUri = `data:${mimeType};base64,${audioBase64}`
-  const url = `${base}/chat/completions`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${s.voiceApiKey}`,
-    },
-    body: JSON.stringify({
-      model: s.voiceAsrModel || 'qwen3-asr-flash',
-      messages: [{ role: 'user', content: [{ type: 'input_audio', input_audio: { data: dataUri } }] }],
-      stream: false,
-      asr_options: {
-        enable_itn: false,
-        ...(s.voiceLang ? { language: s.voiceLang } : {}),
-      },
-    }),
+/** 语音识别核心：按给定 ASR 端点配置，把音频（base64 + mime）转成文字 */
+async function transcribeCore(cfg: VoiceAsrConfig, apiKey: string, audioBase64: string, mimeType: string): Promise<string> {
+  const vars = audioVars({
+    apiKey,
+    audioBase64,
+    mimeType,
+    audioDataUri: `data:${mimeType};base64,${audioBase64}`,
   })
-  if (!res.ok) {
-    const errText = (await res.text()).slice(0, 500)
-    throw new VoiceError(
-      `语音识别失败（${res.status}）：${errText}。若提示 url error / InvalidParameter，请确认「设置 → 语音」里的 ASR 地址用的是百炼控制台展示的工作空间地址（形如 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1），当前为 ${base}`,
-    )
+  const method = cfg.method ?? 'POST'
+  const timeout = AbortSignal.timeout(cfg.timeoutMs ?? 120000)
+
+  let res: Response
+  if ((cfg.format ?? 'multipart') === 'multipart') {
+    const form = new FormData()
+    const bytes = new Uint8Array(Buffer.from(audioBase64, 'base64'))
+    const ext = extFromContentType(mimeType)
+    form.append(cfg.fileField ?? 'file', new Blob([bytes], { type: mimeType }), `audio.${ext}`)
+    const extra = renderTemplate(cfg.body ?? {}, vars)
+    if (extra && typeof extra === 'object') {
+      for (const [k, v] of Object.entries(extra)) {
+        if (v === undefined || v === null) continue
+        form.append(k, typeof v === 'string' ? v : JSON.stringify(v))
+      }
+    }
+    res = await fetch(cfg.url, { method, headers: baseHeaders(cfg, vars), body: form, signal: timeout })
+  } else {
+    const body = renderTemplate(cfg.body ?? {}, vars)
+    res = await fetch(cfg.url, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...baseHeaders(cfg, vars) },
+      body: JSON.stringify(body),
+      signal: timeout,
+    })
   }
-  const json = (await res.json()) as { choices?: DashScopeChoice[] }
-  const text = extractText(json.choices?.[0]?.message?.content).trim()
-  if (!text) throw new VoiceError('语音识别返回为空，请重试或检查音频格式')
+  await assertOk(res, '语音识别')
+  const json = (await res.json().catch(() => null)) as unknown
+  const text = extractText(getByPath(json, cfg.textPath ?? 'text')).trim()
+  if (!text) throw new VoiceError('语音识别返回为空，请重试或检查音频格式与 textPath 配置')
   return text
 }
 
-/** 语音合成缓存文件路径：按 文本+模型+音色 哈希，同内容只合成一次，落盘到 dataDir/voice-cache/ */
-function ttsCachePath(text: string): string | null {
-  const s = getSettings()
-  const key = crypto
-    .createHash('sha256')
-    .update([text, s.voiceTtsModel, s.voiceTtsVoice].join('|'))
-    .digest('hex')
-  return path.join(env.dataDir, 'voice-cache', `${key}.mp3`)
+/** 语音识别：默认用激活档案；传 profileOverride 则用指定档案（设置页测试未保存的配置） */
+export async function transcribeAudio(audioBase64: string, mimeType: string, profileOverride?: VoiceProfile): Promise<string> {
+  const { cfg, apiKey } = profileOverride
+    ? profileAsrEndpoint(profileOverride)
+    : resolveAsrEndpoint(getSettings())
+  return transcribeCore(cfg, apiKey, audioBase64, mimeType)
 }
 
-/** 语音合成：把文字转成音频（返回 MP3 二进制与 Content-Type）。走 DashScope 非实时语音合成 HTTP API，带磁盘缓存。 */
-export async function synthesizeSpeech(text: string): Promise<{ data: Buffer; contentType: string }> {
-  const s = getSettings()
-  if (!s.voiceApiKey) throw new VoiceError('未配置语音 API Key（设置 → 语音）')
+const EXT_CONTENT_TYPE: Record<string, string> = {
+  wav: 'audio/wav',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  pcm: 'audio/pcm',
+}
 
-  const cachePath = ttsCachePath(text)
-  if (cachePath) {
-    try {
-      const cached = fs.readFileSync(cachePath)
-      if (cached.byteLength > 0) return { data: cached, contentType: 'audio/mpeg' }
-    } catch {
-      /* 缓存未命中 */
+/** 语音合成缓存：按 文本+TTS 端点配置 哈希，同内容只合成一次，落盘到 dataDir/voice-cache/ */
+function ttsCacheLookup(text: string, cfg: VoiceTtsConfig): { hit?: { data: Buffer; contentType: string }; write: (data: Buffer, contentType: string) => void } {
+  const key = crypto
+    .createHash('sha256')
+    .update([text, JSON.stringify(cfg)].join('|'))
+    .digest('hex')
+  const dir = path.join(env.dataDir, 'voice-cache')
+  let cached: { data: Buffer; contentType: string } | undefined
+  try {
+    const hit = fs.readdirSync(dir).find((f) => f.startsWith(`${key}.`))
+    if (hit) {
+      const data = fs.readFileSync(path.join(dir, hit))
+      if (data.byteLength > 0) {
+        const ext = hit.slice(key.length + 1)
+        cached = { data, contentType: EXT_CONTENT_TYPE[ext] ?? 'audio/mpeg' }
+      }
     }
+  } catch {
+    /* 缓存未命中 */
   }
-
-  const url = s.voiceTtsUrl
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${s.voiceApiKey}`,
+  return {
+    hit: cached,
+    write: (data, contentType) => {
+      try {
+        fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, `${key}.${extFromContentType(contentType)}`), data)
+      } catch (e) {
+        console.error('写入语音缓存失败', (e as Error).message)
+      }
     },
-    body: JSON.stringify({
-      model: s.voiceTtsModel || 'qwen-audio-3.0-tts-flash',
-      input: {
-        text,
-        voice: s.voiceTtsVoice || 'longanhuan_v3.6',
-        format: 'mp3',
-        sample_rate: 48000,
-      },
-    }),
-  })
-  if (!res.ok) {
-    const errText = (await res.text()).slice(0, 500)
-    throw new VoiceError(
-      `语音合成失败（${res.status}）：${errText}。若提示 url error / InvalidParameter：确认 TTS 地址是完整接口（.../api/v1/services/audio/tts/SpeechSynthesizer）、模型名在 cosyvoice-v2 / qwen-audio-3.0-tts-flash 等列表内、音色与控制台列表一致`,
-    )
   }
-  const json = (await res.json().catch(() => null)) as { output?: { audio?: { url?: string } } } | null
-  const audioUrl = json?.output?.audio?.url
-  if (!audioUrl) throw new VoiceError('语音合成返回中没有音频地址，请检查响应')
-  const audioRes = await fetch(audioUrl)
-  if (!audioRes.ok) throw new VoiceError(`下载音频失败（${audioRes.status}）`)
-  const data = Buffer.from(await audioRes.arrayBuffer())
-  if (data.byteLength === 0) throw new VoiceError('语音合成返回为空')
-  if (cachePath) {
-    try {
-      fs.mkdirSync(path.dirname(cachePath), { recursive: true })
-      fs.writeFileSync(cachePath, data)
-    } catch (e) {
-      console.error('写入语音缓存失败', (e as Error).message)
+}
+
+/** 语音合成核心：按给定 TTS 端点配置，把文字转成音频二进制 */
+async function synthesizeCore(cfg: VoiceTtsConfig, apiKey: string, text: string, useCache: boolean): Promise<{ data: Buffer; contentType: string }> {
+  const cache = ttsCacheLookup(text, cfg)
+  if (useCache && cache.hit) return cache.hit
+
+  const vars: VoiceVars = { apiKey, text }
+  const body = renderTemplate(cfg.body ?? { text: '{{text}}' }, vars)
+  const res = await fetch(cfg.url, {
+    method: cfg.method ?? 'POST',
+    headers: { 'Content-Type': 'application/json', ...baseHeaders(cfg, vars) },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(cfg.timeoutMs ?? 120000),
+  })
+  await assertOk(res, '语音合成')
+
+  let data: Buffer
+  let contentType: string
+  if ((cfg.responseType ?? 'binary') === 'binary') {
+    data = Buffer.from(await res.arrayBuffer())
+    contentType = res.headers.get('content-type') ?? 'audio/wav'
+  } else {
+    const json = (await res.json().catch(() => null)) as unknown
+    const value = getByPath(json, cfg.audioPath ?? '')
+    if (typeof value !== 'string' || !value) {
+      throw new VoiceError('语音合成返回中没有音频字段，请检查 audioPath 配置')
+    }
+    if (/^https?:\/\//.test(value)) {
+      const audioRes = await fetch(value, { signal: AbortSignal.timeout(cfg.timeoutMs ?? 120000) })
+      if (!audioRes.ok) throw new VoiceError(`下载音频失败（${audioRes.status}）`)
+      data = Buffer.from(await audioRes.arrayBuffer())
+      contentType = audioRes.headers.get('content-type') ?? 'audio/mpeg'
+    } else {
+      data = Buffer.from(value.replace(/^data:[^,]*,/, ''), 'base64')
+      contentType = 'audio/wav'
     }
   }
-  const contentType = audioRes.headers.get('content-type') ?? 'audio/mpeg'
+  if (data.byteLength === 0) throw new VoiceError('语音合成返回为空')
+  if (useCache) cache.write(data, contentType)
   return { data, contentType }
+}
+
+/** 语音合成：默认用激活档案（带磁盘缓存）；传 profileOverride 则用指定档案且跳过缓存（设置页测试未保存的配置） */
+export async function synthesizeSpeech(text: string, profileOverride?: VoiceProfile): Promise<{ data: Buffer; contentType: string }> {
+  const { cfg, apiKey } = profileOverride
+    ? profileTtsEndpoint(profileOverride)
+    : resolveTtsEndpoint(getSettings())
+  return synthesizeCore(cfg, apiKey, text, !profileOverride)
 }

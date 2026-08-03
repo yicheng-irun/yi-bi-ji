@@ -186,6 +186,35 @@ export const api = {
   },
   testVoice: () =>
     request<{ ok: boolean; error?: string }>('/api/voice/test', { method: 'POST', body: '{}' }),
+  /** 语音设置页测试：用指定档案（可为未保存的编辑内容）合成音频，返回可播放的 Blob */
+  testVoiceSpeech: async (text: string, profile?: VoiceProfileDraft) => {
+    const res = await fetch('/api/voice/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, profile }),
+    })
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(json.error ?? `HTTP ${res.status}`)
+    }
+    return await res.blob()
+  },
+  /** 语音设置页测试：用指定档案识别音频（录音 / 文件），返回文本 */
+  testVoiceAsr: async (blob: Blob, profile?: VoiceProfileDraft) => {
+    const buf = new Uint8Array(await blob.arrayBuffer())
+    let bin = ''
+    for (let i = 0; i < buf.length; i += 0x8000) {
+      bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+    }
+    const res = await fetch('/api/voice/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audioBase64: btoa(bin), mimeType: blob.type || 'audio/wav', profile }),
+    })
+    const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
+    if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`)
+    return json.text ?? ''
+  },
 }
 
 export interface McpToolInfo {
@@ -249,15 +278,60 @@ export interface Settings {
   backupPassword: string
   backupDatabase: string
   voiceProvider: string
-  voiceApiKey: string
   voiceAsrUrl: string
   voiceAsrModel: string
   voiceTtsUrl: string
   voiceTtsModel: string
   voiceTtsVoice: string
   voiceLang: string
+  voiceProfiles: string
+  voiceActiveProfile: string
+  voiceEnabled: string
   voiceAutoSpeak: string
   voiceAutoSend: string
+}
+
+/** 语音配置档案（设置页编辑用，与后端 voice-config.ts 一致） */
+export interface VoiceAsrDraft {
+  url: string
+  method?: string
+  headers?: Record<string, string>
+  format?: 'multipart' | 'json'
+  fileField?: string
+  body?: unknown
+  textPath?: string
+  timeoutMs?: number
+}
+
+export interface VoiceTtsDraft {
+  url: string
+  method?: string
+  headers?: Record<string, string>
+  body?: unknown
+  responseType?: 'binary' | 'json'
+  audioPath?: string
+  timeoutMs?: number
+}
+
+export interface VoiceProfileDraft {
+  name: string
+  apiKey?: string
+  asr?: VoiceAsrDraft
+  tts?: VoiceTtsDraft
+}
+
+export function parseVoiceProfiles(raw: string): VoiceProfileDraft[] {
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((p): p is VoiceProfileDraft => !!p && typeof p === 'object' && typeof p.name === 'string')
+  } catch {
+    return []
+  }
+}
+
+export function serializeVoiceProfiles(profiles: VoiceProfileDraft[]): string {
+  return JSON.stringify(profiles, null, 2)
 }
 
 export interface CdpTabInfo {
