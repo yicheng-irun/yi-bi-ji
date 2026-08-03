@@ -38,16 +38,19 @@ function startMockVoiceServer(): ServerType {
 
   // TTS：直接返回音频二进制（带调用计数，验证覆盖测试时跳过缓存）
   let binaryHits = 0
+  let lastTtsText = ''
   app.post('/tts-binary', async (c) => {
     const body = await c.req.json<{ text?: string }>().catch(() => ({}) as { text?: string })
     if (!body.text) return c.json({ detail: 'empty text' }, 400)
     binaryHits++
+    lastTtsText = body.text
     return new Response(new Uint8Array(WAV_BYTES), {
       headers: { 'Content-Type': 'audio/wav', 'X-Hits': String(binaryHits) },
     })
   })
 
   app.get('/tts-hits', () => new Response(JSON.stringify({ hits: binaryHits }), { headers: { 'Content-Type': 'application/json' } }))
+  app.get('/tts-last-text', () => new Response(JSON.stringify({ text: lastTtsText }), { headers: { 'Content-Type': 'application/json' } }))
 
   // TTS：返回 JSON，音频字段是 URL（二次下载）
   app.post('/tts-json-url', async (c) => {
@@ -282,6 +285,15 @@ export async function runVoiceTests() {
       adhoc1.status === 200 && adhoc1Buf.equals(WAV_BYTES) && hits2 === hits1 + 1,
       { hits1, hits2, status: adhoc1.status },
     )
+
+    // 合成前剔除英文双引号
+    const quoteRes = await fetch(`${BASE}/api/voice/speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '他说"你好"，"世界"很大', profile: adhocProfile }),
+    })
+    const lastText = ((await (await fetch(`${MOCK_BASE}/tts-last-text`)).json()) as { text: string }).text
+    check('合成文本剔除英文双引号', quoteRes.status === 200 && lastText === '他说你好，世界很大', { lastText })
 
     // 还原设置
     const reset = await api('/api/settings', {

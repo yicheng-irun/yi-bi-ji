@@ -162,12 +162,14 @@ function ttsCacheLookup(text: string, cfg: VoiceTtsConfig): { hit?: { data: Buff
   }
 }
 
-/** 语音合成核心：按给定 TTS 端点配置，把文字转成音频二进制 */
+/** 语音合成核心：按给定 TTS 端点配置，把文字转成音频二进制（剔除英文双引号，避免被读出） */
 async function synthesizeCore(cfg: VoiceTtsConfig, apiKey: string, text: string, useCache: boolean): Promise<{ data: Buffer; contentType: string }> {
-  const cache = ttsCacheLookup(text, cfg)
+  const clean = text.replace(/"/g, '').trim()
+  if (!clean) throw new VoiceError('文本为空')
+  const cache = ttsCacheLookup(clean, cfg)
   if (useCache && cache.hit) return cache.hit
 
-  const vars: VoiceVars = { apiKey, text }
+  const vars: VoiceVars = { apiKey, text: clean }
   const body = renderTemplate(cfg.body ?? { text: '{{text}}' }, vars)
   const res = await fetch(cfg.url, {
     method: cfg.method ?? 'POST',
