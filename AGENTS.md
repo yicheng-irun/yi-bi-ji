@@ -8,6 +8,7 @@
 
 - `apps/server` — Hono + AI SDK v7 + Sequelize(SQLite)，端口 15201
 - `apps/web` — React + TS + styled-components + Vite + vite-plugin-pages，端口 15200（/api 代理到 15201）
+- `apps/android` — 原生 Kotlin + Compose 客户端（独立 Gradle 工程，不纳入 pnpm workspace），GitHub Actions 编译 APK
 
 ## 常用命令
 

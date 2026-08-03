@@ -129,3 +129,12 @@
   - SQLite（`backupType=sqlite`）：只需填备份文件路径（`backupPath`，自动建目录/建库），校验拒绝指向业务库本身
   - MySQL（`backupType=mysql`）：填 Host/Port/User/Password/数据库名（需预先建库）
   - 「一键备份」在备份库自动建表（notes / chat_threads / chat_messages / ai_change_logs / app_settings，通用 schema 由 Sequelize 按 dialect 生成 DDL）并清空后全量同步数据（事务内执行，返回各表行数）
+
+## Android App（`apps/android`）
+
+- 原生 Kotlin + Jetpack Compose 单模块 App（独立于 pnpm workspace，Gradle 构建），只复用 server 的 HTTP API，不含本地数据库
+- 笔记列表：浏览（标题 + 摘要 + 「未提交」徽标）、新建笔记后直接进入编辑页
+- 笔记编辑：标题/正文编辑，停止输入 1s 后自动保存草稿（携带 base 版本号），409 冲突时提示并自动刷新为最新草稿；顶栏 ✓ 一键提交（commit 草稿落正式）
+- Agent 浮窗：屏幕右侧边缘的悬浮按钮唤起，App 内可拖拽面板（拖动标题栏上下移动）；与 agent 流式对话，直接消费 AI SDK UI Message Stream 的 SSE（只解析 `text-delta`/`finish`/`error` 事件），首次发消息时以当前笔记 id 创建会话（`originNoteId` 关联），会话全局共享（切页面不断线）；工具调用等非文本事件不展示
+- 设置页可填 server 地址（DataStore 持久化，默认 `http://10.0.2.2:15201`，即模拟器访问宿主机）；manifest 允许 cleartext（http）以方便局域网直连
+- 构建：本机无需 Android SDK，GitHub Actions（`.github/workflows/android.yml`，push 触及 `apps/android/**` 或手动触发）用 `ubuntu-latest + temurin 17 + gradle wrapper 8.9` 跑 `assembleDebug`，APK 作为 artifact 下载安装
