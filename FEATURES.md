@@ -45,6 +45,8 @@
   - `insert_block` — 锚点插入区块：文末追加 / 指定标题后 / 指定文本后
   - `delete_note` — 标记笔记待删除（软删除，需变更页确认）
   - `set_note_tags` — 设置笔记标签
+  - `remember` — 沉淀长期记忆（偏好/事实/决定/待办，写入即生效，自动查重）
+  - `recall` — 检索长期记忆（默认查已确认，支持类型/状态/关键词过滤）
   - `web_search` — 联网搜索（Bing/百度，Playwright 真实浏览器）
   - `web_fetch` — 打开网页提取正文；动态页面就绪策略为 networkidle 短等 + DOM 稳定性（MutationObserver）+ 内容不足时滚动到底触发懒加载；HTML 页面默认返回 Markdown（保留链接/图片地址并转绝对 URL，可选 `format: 'text'` 纯文本），JSON/纯文本/XML 等文本类接口响应直接返回原始内容（JSON 自动格式化），长内容用 `start`/`maxChars` 翻页
   - `deep_research` — 联网深度调研子代理（`ToolLoopAgent` 嵌套）：主代理把任务委托给独立的研究子代理（独立上下文，web_search/web_fetch + 读写笔记工具，步骤上限 50），子代理进度通过 streaming tool results（preliminary）实时流给前端，前端在工具卡片内渲染子代理的每一步与累积文本；主代理模型侧通过 `toModelOutput` 只看到子代理最终的结构化报告（含来源链接），避免上下文膨胀
@@ -85,6 +87,15 @@
 - `Empty`：`icon + title + compact`（紧凑用于 diff 内空状态），统一各页空状态
 - `Select` / `TagInput` / `Loading`：通用原语，已从 `components/` 迁入
 - `Modal`：通用弹窗（`createPortal` 渲染到 body、点击遮罩/Esc 关闭、滚动锁），`title/children/footer`，设置页 MCP 服务器编辑用
+
+## 长期记忆（memories 表）
+
+- 独立 `memories` 表管理 AI 沉淀的长期记忆：`kind`（fact 事实 / preference 偏好 / decision 决定 / todo 待办）+ `status`（confirmed 生效 / archived 已归档遗忘；pending 保留但默认不使用——记忆无需确认，写入即生效）+ `sourceThreadId` 血缘（来源会话）
+- 记忆管理页 `/memories`（顶部导航「记忆」）：顶部输入框手动记一条（可选类型），搜索框（防抖 300ms，Esc 清空），按类型/「已归档」chip 过滤；卡片流展示内容 + 类型徽标 + 时间 + 来源（来自对话）+ 标签，支持编辑（弹窗改内容/类型/标签）、归档/恢复、彻底删除
+- API：`GET /api/memories`（status/kind/q 过滤 + pendingCount）、`POST /`、`PATCH /:id`、`POST /:id/confirm`、`POST /:id/archive`、`DELETE /:id`
+- agent 工具：`remember(content, kind, tags?)`（先 recall 查重，内容完全重复时返回已有条目不重复创建；写入即生效并记录 `ai_change_logs` action=remember）、`recall(query?, kind?, status?, limit?)`（默认只查 confirmed，query 空返回最近记忆）；均可在设置页「Agent 能力」开关
+- 已确认记忆（最近 50 条，按类型标注）注入主代理系统提示词，对话中自动参考；提示词引导 AI 主动沉淀偏好/事实/决定/待办，不记闲聊
+- 备份同步（`backup.ts`）已包含 memories 表
 
 ## 会话持久化
 

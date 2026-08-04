@@ -6,6 +6,22 @@ import { parseThreadMetadata } from '../services/chat.js'
 import { getSettings } from '../services/settings.js'
 import { createNoteTools, parseEnabledTools } from './tools.js'
 import { loadMcpToolsCached, parseMcpServers } from './mcp.js'
+import { loadConfirmedMemories } from '../services/memories.js'
+
+const MEMORY_KIND_LABEL: Record<string, string> = {
+  fact: '事实',
+  preference: '偏好',
+  decision: '决定',
+  todo: '待办',
+}
+
+/** 已确认的长期记忆注入系统提示词（最近 50 条） */
+async function loadMemoryContext(): Promise<string | null> {
+  const memories = await loadConfirmedMemories(50)
+  if (memories.length === 0) return null
+  const lines = memories.map((m) => `- [${MEMORY_KIND_LABEL[m.kind] ?? m.kind}] ${m.content}`)
+  return `以下是关于用户的长期记忆（已确认，回答时参考；remember 前用 recall 查重，避免与这些重复）：\n${lines.join('\n')}`
+}
 
 /** 名为 AGENTS.md 的笔记作为固定指令注入系统提示词；重名取 id 最小的 */
 async function loadAgentsNote(): Promise<string | null> {
@@ -31,6 +47,7 @@ export async function createNoteAgent(threadId: string, opts: { voiceMode?: bool
       ? `当前对话与笔记 id=${originNoteId} 关联（用户是在这篇笔记的上下文里开启的对话），优先基于它工作。`
       : '当前是全局对话，没有固定关联的笔记，按用户提问自行查找相关笔记。'
   const agentsNote = await loadAgentsNote()
+  const memoryContext = await loadMemoryContext()
   const provider = createOpenAICompatible({
     name: 'custom',
     baseURL: s.aiBaseURL,
@@ -45,9 +62,11 @@ export async function createNoteAgent(threadId: string, opts: { voiceMode?: bool
     providerOptions,
     instructions: `你是一个笔记系统的 AI 助手。用户通过网页编辑器管理 markdown 笔记，你可以在侧边栏与用户对话。
 ${agentsNote ? `\n以下是用户的固定指令（来自笔记《AGENTS.md》，始终遵循）：\n\n${agentsNote}\n` : ''}
+${memoryContext ? `\n${memoryContext}\n` : ''}
 
 你可以使用的工具（function 定义里已有各工具的功能与参数，此处只列使用策略）：
 - 笔记工具：先 list/search 定位，再按需 read，别把整个库塞进上下文；修改前先重读最新内容
+- 记忆工具：对话中出现用户的偏好、重要事实、决定、待办时，用 remember 主动沉淀（先 recall 查重）；回答涉及用户偏好或历史决定的问题前先 recall；不要把闲聊内容、一次性问题记成记忆
 - 标签：创建/整理笔记时主动打标签归类（如每日资讯、随想、稿子、计划、方法论、提示词等），先复用已有标签名，保持命名简洁一致
 - 网页工具：web_fetch 返回 Markdown（含链接和图片地址），需要引用时把链接原样保留进笔记；长文用 start 翻页；触发真人验证或超时，如实告知用户
 - 浏览器工具（用户本机已打开的真实浏览器，需用户先用 scripts/start-browser-cdp.bat 启动）：

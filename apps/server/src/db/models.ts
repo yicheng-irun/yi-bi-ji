@@ -113,6 +113,43 @@ AppSetting.init(
   },
 )
 
+export type MemoryKind = 'fact' | 'preference' | 'decision' | 'todo'
+export type MemoryStatus = 'pending' | 'confirmed' | 'archived'
+
+export class Memory extends Model<InferAttributes<Memory>, InferCreationAttributes<Memory>> {
+  declare id: CreationOptional<number>
+  declare kind: CreationOptional<MemoryKind>
+  declare content: string
+  /** pending = AI 新写待人确认；confirmed = 已确认生效；archived = 已遗忘 */
+  declare status: CreationOptional<MemoryStatus>
+  declare tags: CreationOptional<string>
+  declare sourceThreadId: CreationOptional<string | null>
+  declare createdAt: CreationOptional<Date>
+  declare updatedAt: CreationOptional<Date>
+}
+
+Memory.init(
+  {
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    kind: { type: DataTypes.STRING, allowNull: false, defaultValue: 'fact' },
+    content: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
+    status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'pending' },
+    tags: { type: DataTypes.TEXT, allowNull: false, defaultValue: '[]' },
+    sourceThreadId: { type: DataTypes.STRING, allowNull: true },
+    createdAt: { type: DataTypes.DATE },
+    updatedAt: { type: DataTypes.DATE },
+  },
+  {
+    sequelize,
+    tableName: 'memories',
+    indexes: [
+      { name: 'idx_memories_status', fields: ['status'] },
+      { name: 'idx_memories_kind', fields: ['kind'] },
+      { name: 'idx_memories_updated_at', fields: ['updatedAt'] },
+    ],
+  },
+)
+
 export class ChatMessage extends Model<InferAttributes<ChatMessage>, InferCreationAttributes<ChatMessage>> {
   declare id: string
   declare threadId: string

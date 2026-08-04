@@ -2,6 +2,7 @@ import { readUIMessageStream, toUIMessageStream, tool, type ToolSet, type UIMess
 import { z } from 'zod'
 import { ChatThread } from '../db/models.js'
 import { listNotes, searchNotes, readNote, createNote, aiWriteNote, aiReplaceInNote, aiInsertBlock, aiDeleteNote, updateNoteMeta } from '../services/notes.js'
+import { rememberMemory, recallMemories } from '../services/memories.js'
 import { persistMessages } from '../services/chat.js'
 import { getSettings } from '../services/settings.js'
 import { createWebTools } from './web-tools.js'
@@ -12,6 +13,7 @@ export const MAIN_AGENT_TOOLS = [
   'browser_tabs', 'browser_read', 'browser_screenshot', 'browser_navigate', 'browser_click', 'browser_type', 'browser_eval',
   'list_notes', 'search_notes', 'read_note', 'create_note', 'set_note_tags',
   'write_note', 'replace_in_note', 'insert_block', 'delete_note',
+  'remember', 'recall',
 ] as const
 
 /** 调研子代理全部可用工具（不含 deep_research，避免递归） */
@@ -223,6 +225,41 @@ export function createNoteTools(
         const result = await aiDeleteNote(noteId, threadId)
         return { ok: true, noteId: result.noteId, title: result.title }
       },
+    }),
+
+    remember: tool({
+      description:
+        '沉淀一条长期记忆（用户偏好、事实、决定、待办），立即生效并注入后续对话。记之前必须先用 recall 查是否已有类似记忆，避免重复；内容要写成一句自包含、无歧义的话。',
+      inputSchema: z.object({
+        content: z.string().describe('一句话记忆内容，自包含、无歧义，如「用户偏好用简体中文交流」'),
+        kind: z
+          .enum(['fact', 'preference', 'decision', 'todo'])
+          .describe('fact=事实 preference=偏好 decision=决定 todo=待办'),
+        tags: z.array(z.string()).optional().describe('可选标签，0~3 个'),
+      }),
+      execute: async ({ content, kind, tags }) => {
+        const result = await rememberMemory({ content, kind, tags }, threadId)
+        if (result.duplicated) {
+          return { ok: true as const, duplicated: true, memoryId: result.memory.id, message: '已存在相同记忆，未重复创建' }
+        }
+        return { ok: true as const, duplicated: false, memoryId: result.memory.id, status: result.memory.status }
+      },
+    }),
+
+    recall: tool({
+      description:
+        '检索长期记忆（默认只查用户已确认的）。回答涉及用户偏好、历史决定、待办的问题前先 recall；remember 之前也先 recall 查重。query 留空则返回最近的记忆。',
+      inputSchema: z.object({
+        query: z.string().optional().describe('检索关键词，留空返回最近记忆'),
+        kind: z.enum(['fact', 'preference', 'decision', 'todo']).optional().describe('按类型过滤'),
+        status: z
+          .enum(['pending', 'confirmed', 'archived'])
+          .optional()
+          .describe('按状态过滤，默认 confirmed（已确认）'),
+        limit: z.coerce.number().optional().describe('返回条数，默认 20'),
+      }),
+      execute: async ({ query, kind, status, limit }) =>
+        toJsonSafe(await recallMemories({ query, kind, status, limit })),
     }),
   }
 

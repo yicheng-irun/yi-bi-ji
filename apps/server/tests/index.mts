@@ -6,6 +6,7 @@ import { runMcpTests } from './mcp.test.mts'
 import { runChatTests } from './chat.test.mts'
 import { runBrowserTests } from './browser.test.mts'
 import { runVoiceTests } from './voice.test.mts'
+import { runMemoryTests } from './memories.test.mts'
 
 async function main() {
   try {
@@ -17,6 +18,7 @@ async function main() {
     await runBrowserTests()
     await runChatTests()
     await runVoiceTests()
+    await runMemoryTests()
   } finally {
     stopServer()
   }

@@ -14,6 +14,7 @@ import { mcpRoutes } from './routes/mcp.js'
 import { screenshotsRoutes } from './routes/screenshots.js'
 import { browserRoutes } from './routes/browser.js'
 import { voiceRoutes } from './routes/voice.js'
+import { memoriesRoutes } from './routes/memories.js'
 import { closeBrowser } from './services/browser.js'
 import { closeCdpBrowser } from './services/cdp.js'
 import { initSettingsCache } from './services/settings.js'
@@ -38,6 +39,7 @@ app.route('/api/mcp', mcpRoutes)
 app.route('/api/screenshots', screenshotsRoutes)
 app.route('/api/browser', browserRoutes)
 app.route('/api/voice', voiceRoutes)
+app.route('/api/memories', memoriesRoutes)
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`)

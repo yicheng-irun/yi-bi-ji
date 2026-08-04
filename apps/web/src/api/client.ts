@@ -78,6 +78,7 @@ export const AI_LOG_ACTIONS: Record<string, string> = {
   insert_block: '插入区块',
   delete_note: '删除笔记',
   set_note_tags: '设置标签',
+  remember: '沉淀记忆',
 }
 
 /** 当前前端实例的唯一 id，用于识别并忽略 SSE 中自己产生的回声事件 */
@@ -113,6 +114,31 @@ export interface SearchResultItem {
   deletedAt: string | null
 }
 
+export type MemoryKind = 'fact' | 'preference' | 'decision' | 'todo'
+export type MemoryStatus = 'pending' | 'confirmed' | 'archived'
+
+export interface Memory {
+  id: number
+  kind: MemoryKind
+  content: string
+  status: MemoryStatus
+  tags: string[]
+  sourceThreadId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const MEMORY_KINDS: { value: MemoryKind; label: string }[] = [
+  { value: 'fact', label: '事实' },
+  { value: 'preference', label: '偏好' },
+  { value: 'decision', label: '决定' },
+  { value: 'todo', label: '待办' },
+]
+
+export const MEMORY_KIND_LABEL: Record<MemoryKind, string> = Object.fromEntries(
+  MEMORY_KINDS.map((k) => [k.value, k.label]),
+) as Record<MemoryKind, string>
+
 export const api = {
   listNotes: () => request<Note[]>('/api/notes'),
   getNote: (id: number) => request<Note>(`/api/notes/${id}`),
@@ -120,6 +146,21 @@ export const api = {
     request<{ total: number; page: number; perPage: number; notes: SearchResultItem[] }>(
       `/api/notes/search?q=${encodeURIComponent(q)}`,
     ),
+  listMemories: (params: { status?: string; kind?: string; q?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    if (params.kind) qs.set('kind', params.kind)
+    if (params.q) qs.set('q', params.q)
+    const q = qs.toString()
+    return request<{ pendingCount: number; memories: Memory[] }>(`/api/memories${q ? `?${q}` : ''}`)
+  },
+  createMemory: (data: { content: string; kind?: MemoryKind; tags?: string[] }) =>
+    request<Memory>('/api/memories', { method: 'POST', body: JSON.stringify(data) }),
+  updateMemory: (id: number, data: { content?: string; kind?: MemoryKind; tags?: string[] }) =>
+    request<Memory>(`/api/memories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  archiveMemory: (id: number) => request<Memory>(`/api/memories/${id}/archive`, { method: 'POST', body: '{}' }),
+  confirmMemory: (id: number) => request<Memory>(`/api/memories/${id}/confirm`, { method: 'POST', body: '{}' }),
+  deleteMemory: (id: number) => request<{ ok: boolean }>(`/api/memories/${id}`, { method: 'DELETE' }),
   createNote: (title: string) => request<Note>('/api/notes', { method: 'POST', body: JSON.stringify({ title }) }),
   deleteNote: (id: number) => request<Note>(`/api/notes/${id}`, { method: 'DELETE' }),
   saveDraft: (
@@ -399,6 +440,8 @@ export const AGENT_TOOLS: AgentToolInfo[] = [
   { name: 'replace_in_note', label: '文本替换', hint: '在笔记中做字符串替换' },
   { name: 'insert_block', label: '插入区块', hint: '在笔记中锚点插入 markdown 区块' },
   { name: 'delete_note', label: '删除笔记', hint: '标记笔记待删除（软删除）' },
+  { name: 'remember', label: '沉淀记忆', hint: '把用户偏好/事实/决定/待办记入长期记忆（待人确认）' },
+  { name: 'recall', label: '检索记忆', hint: '检索已确认的长期记忆' },
 ]
 
 /** 调研子代理可用工具（不含 deep_research，避免递归） */

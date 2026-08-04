@@ -11,6 +11,7 @@ export default function App() {
         <span className="brand">bi-ji</span>
         <nav>
           <NavLink to="/" end>笔记</NavLink>
+          <NavLink to="/memories">记忆</NavLink>
           <NavLink to="/changes">变更</NavLink>
           <NavLink to="/conversations">会话</NavLink>
           <NavLink to="/ai-logs">AI 记录</NavLink>

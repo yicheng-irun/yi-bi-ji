@@ -5,7 +5,7 @@ import { sequelize as source } from '../db/index.js'
 import { env } from '../env.js'
 import { getSettings, type Settings } from './settings.js'
 
-const TABLES = ['notes', 'chat_threads', 'chat_messages', 'ai_change_logs', 'app_settings']
+const TABLES = ['notes', 'chat_threads', 'chat_messages', 'ai_change_logs', 'app_settings', 'memories']
 
 /** 目标库建表结构（跨 dialect 通用，由 Sequelize 生成 DDL） */
 const TABLE_SCHEMA: Record<string, ModelAttributes<Model, any>> = {
@@ -51,6 +51,16 @@ const TABLE_SCHEMA: Record<string, ModelAttributes<Model, any>> = {
   app_settings: {
     key: { type: DataTypes.STRING(128), primaryKey: true },
     value: { type: DataTypes.TEXT, allowNull: false },
+    createdAt: DataTypes.DATE,
+    updatedAt: DataTypes.DATE,
+  },
+  memories: {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    kind: { type: DataTypes.STRING(32), allowNull: false },
+    content: { type: DataTypes.TEXT, allowNull: false },
+    status: { type: DataTypes.STRING(32), allowNull: false },
+    tags: DataTypes.TEXT,
+    sourceThreadId: DataTypes.STRING(64),
     createdAt: DataTypes.DATE,
     updatedAt: DataTypes.DATE,
   },
